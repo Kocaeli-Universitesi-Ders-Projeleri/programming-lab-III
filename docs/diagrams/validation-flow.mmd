@@ -1,0 +1,19 @@
+flowchart TD
+  A[Authenticated upload] --> B{CSRF and user quota valid?}
+  B -->|No| Reject[Reject safely]
+  B -->|Yes| C{Admission and file size valid?}
+  C -->|No| Reject
+  C -->|Yes| D[Worker checks MIME and active content]
+  D --> E{Safe within resource bounds?}
+  E -->|No| Reject
+  E -->|Yes| F[Private file plus transactional metadata]
+  F --> G[ValidationEngine structured form checks]
+  G --> H{Automatic rules pass?}
+  H -->|No| I[INVALID and actionable report]
+  H -->|Yes| J[UNDER_REVIEW]
+  J --> K[Admin compares original and saves manual checks]
+  K --> L{Revalidation and all checks pass?}
+  L -->|No| J
+  L -->|Yes| M[APPROVED]
+  M --> N[Revalidate and complete]
+  N --> O[COMPLETED immutable]

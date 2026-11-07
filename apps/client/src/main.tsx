@@ -1,0 +1,12 @@
+import { AuthProvider } from './pages/Auth';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
+import { App } from './pages/App';
+import './styles/index.css';
+import { CookiePreferences, SiteFooter } from './components/Privacy';
+import { ErrorBoundary } from './components/ErrorBoundary';
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClientProvider client={queryClient}><BrowserRouter><CookiePreferences><ErrorBoundary><AuthProvider><App /></AuthProvider></ErrorBoundary><SiteFooter/></CookiePreferences></BrowserRouter><Toaster richColors position="top-right" /></QueryClientProvider></React.StrictMode>);

@@ -1,0 +1,57 @@
+erDiagram
+  User ||--o| StudentProfile : has
+  User ||--o{ Session : owns
+  User ||--o{ InternshipApplication : submits
+  User ||--o{ ImportBatch : stages
+  User ||--o{ AuditLog : acts
+  InternshipApplication ||--|| Document : references
+  InternshipApplication ||--o| ValidationReport : produces
+  InternshipApplication ||--o{ AuditLog : records
+  User {
+    ObjectId _id PK
+    string username UK
+    string email UK
+    string passwordHash
+    string role
+    boolean active
+  }
+  StudentProfile {
+    ObjectId user FK
+    string studentNumber UK
+    string identityNumber
+    number healthStatus
+  }
+  Session {
+    ObjectId user FK
+    date expiresAt
+  }
+  InternshipApplication {
+    ObjectId student FK
+    ObjectId document FK
+    string number UK
+    string status
+    object data
+    number version
+  }
+  Document {
+    ObjectId application FK
+    ObjectId owner FK
+    string storageKey
+    string sha256
+    number size
+  }
+  ValidationReport {
+    ObjectId application FK
+    boolean readyForApproval
+    array results
+  }
+  ImportBatch {
+    ObjectId owner FK
+    array rows
+    date expiresAt
+  }
+  AuditLog {
+    ObjectId user FK
+    ObjectId application FK
+    string event
+  }

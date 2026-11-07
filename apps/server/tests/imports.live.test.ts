@@ -1,0 +1,61 @@
+import { expect, it } from 'vitest';
+import request from './helpers/request.js';
+import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
+import { app } from '../src/app.js';
+import { env } from '../src/config/env.js';
+import { User, StudentProfile, AuditLog, Session } from '../src/models/auth.js';
+import { ImportBatch } from '../src/models/ImportBatch.js';
+import { columns } from '../src/services/importParser.js';
+it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: önizleme, onay, mükerrer, sahiplik ve öğrenci girişi', async () => {
+  await mongoose.connect(env.MONGODB_URI, { dbName: 'kou_staj_import_tests', serverSelectionTimeoutMS: 10000 });
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+  const username = 'import-admin-' + suffix;
+  const password = randomUUID();
+  const studentNumber = 'TEST' + suffix;
+  const email = suffix + '@example.test';
+  const ids: mongoose.Types.ObjectId[] = [];
+  try {
+    await Promise.all([User.init(), StudentProfile.init(), ImportBatch.init(), Session.init(), AuditLog.init()]);
+    const admin = await User.create({ username, email: 'admin-' + email, name: 'Import Test Admin', role: 'ROLE_ADMIN', passwordHash: await bcrypt.hash(password, 12) }); ids.push(admin._id);
+    const other = await User.create({ username: 'other-' + suffix, email: 'other-' + email, name: 'Other Admin', role: 'ROLE_ADMIN', passwordHash: await bcrypt.hash(password, 12) }); ids.push(other._id);
+    const login = await request(app).post('/api/v1/auth/login').send({ identifier: username, password });
+    const cookie = login.headers['set-cookie'][0].split(';')[0];
+    const otherLogin = await request(app).post('/api/v1/auth/login').send({ identifier: other.username, password });
+    const otherCookie = otherLogin.headers['set-cookie'][0].split(';')[0];
+    const row = ['Sentetik Test', '1' + Date.now().toString().slice(-10), 'TR', studentNumber, '2003-01-15', 'Örnek Mahallesi No:1 İzmit Kocaeli', 'Yazılım Mühendisliği', '2026-2027', '0', email, '+905550000001', '1'];
+    const invalid = [...row]; invalid[3] = 'BAD' + suffix; invalid[1] = '20000000001'; invalid[9] = 'invalid';
+    const csv = Buffer.from([columns.join(','), row.join(','), invalid.join(',')].join('\n'));
+    const preview = await request(app).post('/api/v1/admin/students/import').set('Cookie', cookie).attach('file', csv, { filename: 'test.csv', contentType: 'text/csv' });
+    expect(preview.status).toBe(201); expect(preview.body.valid).toBe(1); expect(preview.body.invalid).toBe(1);
+    expect(await StudentProfile.countDocuments({ studentNumber })).toBe(0);
+    const path = '/api/v1/admin/students/import/' + preview.body.id + '/confirm';
+    expect((await request(app).post(path).set('Cookie', otherCookie).send({ confirm: true })).status).toBe(404);
+    expect((await request(app).post(path).set('Cookie', cookie).send({ confirm: false })).status).toBe(400);
+    const result = await request(app).post(path).set('Cookie', cookie).send({ confirm: true });
+    expect(result.status).toBe(200); expect(result.body.successful).toBe(1); expect(result.body.failed).toBe(1);
+    const created = await User.findOne({ email }).select('+passwordHash');
+    expect(created).not.toBeNull(); ids.push(created!._id);
+    expect(await bcrypt.compare(result.body.credentials[0].password, created!.passwordHash)).toBe(true);
+    const stored = await StudentProfile.findOne({ studentNumber }).select('+identityNumber');
+    expect(stored?.identityNumber).toBe(row[1]); expect(stored?.healthStatus).toBe(1);
+    const replay = await request(app).post(path).set('Cookie', cookie).send({ confirm: true });
+    expect(replay.body.alreadyCommitted).toBe(true); expect(replay.body.credentials).toEqual([]);
+    expect(await StudentProfile.countDocuments({ studentNumber })).toBe(1);
+    const repeat = await request(app).post('/api/v1/admin/students/import').set('Cookie', cookie).attach('file', csv, { filename: 'test.csv', contentType: 'text/csv' });
+    expect(repeat.body.valid).toBe(0); expect(repeat.body.rows[0].errors.join()).toContain('zaten kayıtlı');
+    const studentLogin = await request(app).post('/api/v1/auth/login').send({ identifier: result.body.credentials[0].username, password: result.body.credentials[0].password });
+    expect(studentLogin.status).toBe(200);
+    const studentCookie = studentLogin.headers['set-cookie'][0].split(';')[0];
+    expect((await request(app).post('/api/v1/admin/students/import').set('Cookie', studentCookie).attach('file', csv, 'test.csv')).status).toBe(403);
+    expect(await AuditLog.countDocuments({ user: admin._id, event: 'STUDENT_IMPORT_COMMITTED' })).toBe(1);
+    await ImportBatch.updateOne({ _id: repeat.body.id }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
+    expect((await request(app).post('/api/v1/admin/students/import/' + repeat.body.id + '/confirm').set('Cookie', cookie).send({ confirm: true })).status).toBe(404);
+  } finally {
+    // Also find the imported user if an assertion failed before its id was collected.
+    const imported = await User.findOne({ email }); if (imported) ids.push(imported._id);
+    await Promise.all([ImportBatch.deleteMany({ owner: { $in: ids } }), StudentProfile.deleteMany({ user: { $in: ids } }), Session.deleteMany({ user: { $in: ids } }), AuditLog.deleteMany({ user: { $in: ids } }), User.deleteMany({ _id: { $in: ids } })]);
+    await mongoose.disconnect();
+  }
+}, 120000);

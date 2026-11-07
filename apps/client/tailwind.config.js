@@ -1,0 +1,1 @@
+export default { content: ['./index.html', './src/**/*.{ts,tsx}'], theme: { extend: { colors: { primary: 'var(--primary)', teal: 'var(--teal)', sidebar: 'var(--sidebar)', background: 'var(--background)', surface: 'var(--surface)', ink: 'var(--text)', success: 'var(--success)', warning: 'var(--warning)', danger: 'var(--error)' } } }, plugins: [] };

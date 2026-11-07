@@ -1,0 +1,10 @@
+flowchart LR
+  Browser[React UI] -->|Same origin HTTPS| Edge[TLS reverse proxy]
+  Edge -->|Trusted loopback| API[Express API]
+  API --> Auth[Session and role guards]
+  API --> CSRF[CSRF and input validation]
+  API --> Limits[Per-user limits and admission]
+  Limits --> Worker[Bounded inspection worker]
+  API --> Rules[ValidationEngine]
+  API -->|TLS| Atlas[(MongoDB Atlas)]
+  API --> Private[(Private files and SHA-256)]

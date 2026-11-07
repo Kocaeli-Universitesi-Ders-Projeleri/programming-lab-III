@@ -1,0 +1,24 @@
+{
+  "name": "kou-staj-system",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c cyan,green \"npm run dev -w @kou/server\" \"npm run dev -w @kou/client\"",
+    "build": "npm run build -w @kou/shared && npm run build -w @kou/client && npm run build -w @kou/server",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "predev": "npm run build -w @kou/shared",
+    "pretest": "npm run build -w @kou/shared && npm run build -w @kou/server",
+    "pretypecheck": "npm run build -w @kou/shared"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "~5.8.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

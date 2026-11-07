@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-07",
+  "scope": "Local audit; not a deployed production certificate",
+  "typecheck": { "exitCode": 0 },
+  "build": { "exitCode": 0 },
+  "productionSmoke": {
+    "redirect": true,
+    "html": true,
+    "csp": true,
+    "secureCookie": true,
+    "api404": true,
+    "hstsDefaultOff": true,
+    "localFont": true,
+    "fontLicense": true,
+    "environment": "Local Supertest trusted-proxy simulation"
+  },
+  "atlasReadonly": {
+    "ping": "PASS",
+    "tlsConfigured": true,
+    "certificateBypass": false,
+    "privilegeInspection": "PASS",
+    "broadWritePrivileges": true,
+    "privilegeResourceCount": 38,
+    "atlasNetworkAccess": "NOT TESTED",
+    "atlasBackupSettings": "NOT TESTED"
+  },
+  "dependencyAudit": {
+    "knownVulnerabilitiesDuringAudit": 0,
+    "finalOfflineRepeatVulnerabilities": 0,
+    "doesNotProveAllDependenciesSupported": true
+  },
+  "notTested": [
+    "Actual deployed TLS edge and certificate",
+    "Real browser responsive, PDF preview and font glyph rendering",
+    "Windows storage ACL and actual file symlink rejection (EPERM)",
+    "Backup restore drill",
+    "Git history",
+    "Atlas secret rotation and least privilege remediation"
+  ]
+}

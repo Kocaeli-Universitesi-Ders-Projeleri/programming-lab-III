@@ -1,0 +1,255 @@
+{
+  "frontendRouteCount": 17,
+  "backendEndpointCount": 27,
+  "frontend": [
+    {
+      "path": "/",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 16
+    },
+    {
+      "path": "/privacy",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 16
+    },
+    {
+      "path": "/cookies",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 16
+    },
+    {
+      "path": "/login",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 16
+    },
+    {
+      "path": "/admin",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 45
+    },
+    {
+      "path": "/student",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 45
+    },
+    {
+      "path": "/student/profile",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 46
+    },
+    {
+      "path": "/admin/students",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 46
+    },
+    {
+      "path": "/student/applications",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 47
+    },
+    {
+      "path": "/admin/applications",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 47
+    },
+    {
+      "path": "/student/completed",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 48
+    },
+    {
+      "path": "/admin/completed",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 48
+    },
+    {
+      "path": "/student/upload",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 49
+    },
+    {
+      "path": "/admin/import",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 49
+    },
+    {
+      "path": "/student/applications/:id/edit",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 50
+    },
+    {
+      "path": "/student/applications/:id",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 51
+    },
+    {
+      "path": "/admin/applications/:id",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 51
+    }
+  ],
+  "backend": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/csrf",
+      "file": "apps/server/src/app.ts",
+      "line": 26
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "file": "apps/server/src/app.ts",
+      "line": 28
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health/ready",
+      "file": "apps/server/src/app.ts",
+      "line": 32
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/applications/calendar",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 29
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications/calculate-days",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 30
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 72
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications/:id/documents",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 73
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/students/me/applications",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 81
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/applications",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 82
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/applications/completed",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 83
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/applications/:id",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 84
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/applications/:id",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 84
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/applications/:id/report",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 88
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/documents/:id/download",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 89
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/applications/:id/status",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 98
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/applications/:id/review",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 119
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/applications/:id/validate",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 135
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/students/me/dashboard",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 150
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 14
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 51
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 52
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/students/me",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 58
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/access",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 63
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/students/import",
+      "file": "apps/server/src/routes/imports.ts",
+      "line": 28
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/students/import/:id/confirm",
+      "file": "apps/server/src/routes/imports.ts",
+      "line": 43
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dashboard/stats",
+      "file": "apps/server/src/routes/panels.ts",
+      "line": 8
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/students",
+      "file": "apps/server/src/routes/panels.ts",
+      "line": 19
+    }
+  ]
+}

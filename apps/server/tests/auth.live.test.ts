@@ -1,0 +1,57 @@
+import { it, expect } from 'vitest';
+import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
+import request from './helpers/request.js';
+import { randomUUID } from 'node:crypto';
+import { app } from '../src/app.js';
+import { env } from '../src/config/env.js';
+import { User, Session, StudentProfile, AuditLog } from '../src/models/auth.js';
+it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: giriş, roller, kilit, çıkış ve token iptali', async () => {
+  await mongoose.connect(env.MONGODB_URI, { dbName: 'kou_staj_auth_tests', serverSelectionTimeoutMS: 10000 });
+  const suffix = randomUUID();
+  const password = randomUUID();
+  const ids: mongoose.Types.ObjectId[] = [];
+  try {
+    await Promise.all([User.init(), Session.init(), StudentProfile.init(), AuditLog.init()]);
+    const hash = await bcrypt.hash(password, 12);
+    const student = await User.create({ username: 'student-' + suffix, email: suffix + '@example.test', name: 'Test Student', role: 'ROLE_STUDENT', passwordHash: hash }); ids.push(student._id);
+    const admin = await User.create({ username: 'admin-' + suffix, email: 'admin-' + suffix + '@example.test', name: 'Test Admin', role: 'ROLE_ADMIN', passwordHash: hash }); ids.push(admin._id);
+    await StudentProfile.create({ user: student._id, studentNumber: suffix, department: 'Test' });
+    const login = await request(app).post('/api/v1/auth/login').send({ identifier: student.email, password });
+    expect(login.status).toBe(200);
+    expect(login.body.user.passwordHash).toBeUndefined();
+    const cookie = login.headers['set-cookie'][0].split(';')[0];
+    expect(login.headers['set-cookie'][0]).toContain('HttpOnly');
+    expect((await request(app).get('/api/v1/auth/me').set('Cookie', cookie)).body.user.id).toBe(student.id);
+    expect((await request(app).get('/api/v1/students/me').set('Cookie', cookie)).body.profile.studentNumber).toBe(suffix);
+    expect((await request(app).get('/api/v1/admin/access').set('Cookie', cookie)).status).toBe(403);
+    expect((await request(app).get('/api/v1/admin/dashboard/stats').set('Cookie', cookie)).status).toBe(403);
+    expect((await request(app).get('/api/v1/admin/students').set('Cookie', cookie)).status).toBe(403);
+    expect((await request(app).post('/api/v1/auth/logout').set('Cookie', cookie)).status).toBe(204);
+    expect((await request(app).get('/api/v1/auth/me').set('Cookie', cookie)).status).toBe(401);
+    for (let i = 0; i < 5; i++) expect((await request(app).post('/api/v1/auth/login').send({ identifier: student.username, password: 'wrong' })).status).toBe(401);
+    expect((await request(app).post('/api/v1/auth/login').send({ identifier: student.username, password })).status).toBe(423);
+    expect(await AuditLog.countDocuments({ user: student._id, event: 'LOGIN_FAILED' })).toBe(5);
+    await User.updateOne({ _id: student._id }, { $set: { lockedUntil: new Date(Date.now() - 1000) } });
+    expect((await request(app).post('/api/v1/auth/login').send({ identifier: student.username, password })).status).toBe(200);
+    const adminLogin = await request(app).post('/api/v1/auth/login').send({ identifier: admin.username, password });
+    const adminCookie = adminLogin.headers['set-cookie'][0].split(';')[0];
+    expect((await request(app).get('/api/v1/admin/access').set('Cookie', adminCookie)).status).toBe(200);
+    const stats = await request(app).get('/api/v1/admin/dashboard/stats').set('Cookie', adminCookie);
+    expect(stats.status).toBe(200);
+    expect(stats.body.students).toBeGreaterThanOrEqual(1);
+    expect(typeof stats.body.applications).toBe('number');
+    const list = await request(app).get('/api/v1/admin/students').query({ q: suffix, department: 'Test' }).set('Cookie', adminCookie);
+    expect(list.status).toBe(200);
+    expect(list.body.total).toBe(1);
+    expect(list.body.items[0].user.name).toBe('Test Student');
+    expect(list.body.items[0].user.passwordHash).toBeUndefined();
+    const noResults = await request(app).get('/api/v1/admin/students').query({ q: '[.*' }).set('Cookie', adminCookie);
+    expect(noResults.body.total).toBe(0);
+    expect((await request(app).get('/api/v1/admin/students').query({ page: -1 }).set('Cookie', adminCookie)).status).toBe(400);
+    expect((await request(app).get('/api/v1/students/me').set('Cookie', adminCookie)).status).toBe(403);
+  } finally {
+    await Promise.all([Session.deleteMany({ user: { $in: ids } }), AuditLog.deleteMany({ user: { $in: ids } }), StudentProfile.deleteMany({ user: { $in: ids } }), User.deleteMany({ _id: { $in: ids } })]);
+    await mongoose.disconnect();
+  }
+}, 60000);

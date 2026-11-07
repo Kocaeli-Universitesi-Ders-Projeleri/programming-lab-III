@@ -1,0 +1,24 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApplicationFormPage } from './ApplicationForm';
+import { api } from '../services/api';
+vi.mock('../services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('öğrenci profilini doldurur ve çalışma günü değişince tatilleri düşerek hesaplar', async () => {
+  vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/students/me' ? { user: { name: 'Sentetik Test', email: 'test@example.test' }, profile: { studentNumber: '12345', department: 'Yazılım Mühendisliği' } } : { maxDocumentMB: 10 } }));
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={cache}><MemoryRouter><ApplicationFormPage/></MemoryRouter></QueryClientProvider>);
+  await screen.findByLabelText('Ad soyad');
+  expect((screen.getByLabelText('Ad soyad') as HTMLInputElement).value).toBe('Sentetik Test');
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Staj başlangıcı'), '2026-07-13'); await user.type(screen.getByLabelText('Staj bitişi'), '2026-07-17');
+  expect(screen.getByText('Hesaplanan gün: 4')).toBeDefined();
+  await user.click(screen.getByRole('checkbox', { name: 'Cuma' }));
+  expect(screen.getByText('Hesaplanan gün: 3')).toBeDefined();
+  await user.click(screen.getByRole('button', { name: 'Başvuruyu ve belgeyi kaydet' }));
+  expect(api.post).not.toHaveBeenCalled();
+  cache.clear();
+});

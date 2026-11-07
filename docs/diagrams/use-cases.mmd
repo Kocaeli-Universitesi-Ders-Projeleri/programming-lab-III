@@ -1,0 +1,11 @@
+flowchart LR
+  Student[Student] --> Login[Login and logout]
+  Admin[Commission admin] --> Login
+  Student --> Profile[Read own profile]
+  Student --> Upload[Submit or edit own Ek-16]
+  Student --> Report[Read own report and download own document]
+  Admin --> Import[Preview and confirm dataset import]
+  Admin --> Lists[Read student and application lists]
+  Admin --> Review[Review original and manual checks]
+  Review --> Approval[Approve and complete after validation]
+  Admin --> Recheck[Revalidate report]

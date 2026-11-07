@@ -1,0 +1,23 @@
+classDiagram
+  class ValidationRule {
+    <<abstract>>
+    +validate(context) RuleResult[]
+    #result()
+    #notice()
+  }
+  class ValidationEngine {
+    -rules ValidationRule[]
+    +validate(context) ApplicationValidationReport
+  }
+  ValidationEngine o-- ValidationRule
+  ValidationRule <|-- SchemaValidationRule
+  ValidationRule <|-- StudentMatchingRule
+  ValidationRule <|-- IdentityValidationRule
+  ValidationRule <|-- ContactValidationRule
+  ValidationRule <|-- AddressValidationRule
+  ValidationRule <|-- DateValidationRule
+  ValidationRule <|-- AcademicYearValidationRule
+  ValidationRule <|-- InternshipDaysValidationRule
+  ValidationRule <|-- EngineerValidationRule
+  ValidationRule <|-- EmployerValidationRule
+  ValidationRule <|-- ManualSignatureRule

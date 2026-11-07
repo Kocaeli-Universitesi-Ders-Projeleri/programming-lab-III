@@ -1,0 +1,20 @@
+sequenceDiagram
+  participant UI as React
+  participant API as Express
+  participant DB as Atlas
+  UI->>API: GET auth/csrf
+  API-->>UI: Signed token and HttpOnly cookie
+  UI->>API: POST login with token and credentials
+  API->>DB: Read active user and current lock
+  API->>API: Compare bcrypt hash
+  API->>DB: Conditional atomic lock reset
+  alt Locked or credentials invalid
+    API-->>UI: 401 or 423
+  else Valid
+    API->>DB: Rotate previous browser session
+    API-->>UI: HttpOnly session cookie and user
+    UI->>UI: Reset CSRF cache and navigate by role
+    UI->>API: Authenticated request
+    API->>DB: Verify session and current active user role
+    API-->>UI: Authorized response
+  end

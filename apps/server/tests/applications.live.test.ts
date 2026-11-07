@@ -1,0 +1,62 @@
+import { expect, it } from 'vitest';
+import request from './helpers/request.js';
+import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
+import sharp from 'sharp';
+import { randomUUID } from 'node:crypto';
+import { todayInTurkey, countInternshipDays, type ApplicationInput } from '@kou/shared';
+import { app } from '../src/app.js';
+import { env } from '../src/config/env.js';
+import { User, StudentProfile, AuditLog, Session } from '../src/models/auth.js';
+import { Application, Document, ValidationReport } from '../src/models/application.js';
+import { removePrivateFile } from '../src/services/privateStorage.js';
+it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: Ek-16 yükleme, sahiplik, inceleme ve yeniden yükleme', async () => {
+  await mongoose.connect(env.MONGODB_URI, { dbName: 'kou_staj_application_tests', serverSelectionTimeoutMS: 10000 });
+  const prefix = randomUUID().replaceAll('-', '').slice(0, 12), password = randomUUID();
+  const ids: mongoose.Types.ObjectId[] = [], appIds: mongoose.Types.ObjectId[] = [];
+  try {
+    await Promise.all([User.init(), StudentProfile.init(), Application.init(), Document.init(), ValidationReport.init(), AuditLog.init(), Session.init()]);
+    const cookies: string[] = [];
+    for (const role of ['ROLE_STUDENT', 'ROLE_STUDENT', 'ROLE_ADMIN']) {
+      const index = ids.length;
+      const user = await User.create({ username: prefix + index, email: prefix + index + '@example.test', name: 'Sentetik Test', role, passwordHash: await bcrypt.hash(password, 12) }); ids.push(user._id);
+      if (role === 'ROLE_STUDENT') await StudentProfile.create({ user: user._id, studentNumber: prefix + index, department: 'Yazılım Mühendisliği' });
+      const login = await request(app).post('/api/v1/auth/login').send({ identifier: user.username, password }); expect(login.status).toBe(200); cookies.push(login.headers['set-cookie'][0].split(';')[0]);
+    }
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).png().toBuffer();
+    const data: ApplicationInput = { name: 'Sentetik Test', studentNumber: prefix + '0', identityNumber: '10000000001', nationality: 'TR', department: 'Yazılım Mühendisliği', birthDate: '2003-01-15', academicYear: '2026-2027', semester: 'Yaz', previousInternshipDays: 0, email: prefix + '0@example.test', phone: '+905550000001', address: 'Örnek Mahallesi No:1 İzmit Kocaeli', healthStatus: 1, startDate: '2027-07-01', endDate: '2027-07-30', submissionDate: todayInTurkey(), workingDays: [1,2,3,4,5], declaredDays: countInternshipDays('2027-07-01', '2027-07-30', [1,2,3,4,5]).days!, companyName: 'Sentetik İşletme', abroad: false, serviceArea: 'Yazılım', companyPhone: '+905550000002', fax: '', companyEmail: 'company@example.test', website: '', employeeCount: 10, engineerCount: 5, engineerDepartments: '', paid: false, companyAddress: 'Örnek adres', employerName: 'Sentetik Yetkili', employerTitle: 'Mühendis', employerEmail: 'employer@example.test', employerPhone: '+905550000003' };
+    const create = await request(app).post('/api/v1/applications').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'ek16.png', contentType: 'image/png' });
+    expect(create.status).toBe(201); const id = create.body.id; appIds.push(new mongoose.Types.ObjectId(id));
+    const detail = await request(app).get('/api/v1/applications/' + id).set('Cookie', cookies[0]); expect(detail.body.status).toBe('UPLOADED'); expect(detail.body.calculatedDays).toBe(data.declaredDays);
+    const docId = detail.body.document._id;
+    expect((await request(app).get('/api/v1/applications/' + id).set('Cookie', cookies[1])).status).toBe(404);
+    expect((await request(app).get('/api/v1/applications/' + id + '/report').set('Cookie', cookies[1])).status).toBe(404);
+    expect((await request(app).get('/api/v1/documents/' + docId + '/download').set('Cookie', cookies[1])).status).toBe(404);
+    const download = await request(app).get('/api/v1/documents/' + docId + '/download').set('Cookie', cookies[0]); expect(download.status).toBe(200); expect(download.body).toEqual(png);
+    const otherList = await request(app).get('/api/v1/students/me/applications').set('Cookie', cookies[1]); expect(otherList.body.total).toBe(0);
+    const studentStats = await request(app).get('/api/v1/students/me/dashboard').set('Cookie', cookies[0]); expect(studentStats.body.stats.total).toBe(1);
+    expect((await request(app).patch('/api/v1/admin/applications/' + id + '/status').set('Cookie', cookies[0]).send({ status: 'UNDER_REVIEW' })).status).toBe(403);
+    expect((await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'new.png', contentType: 'image/png' })).status).toBe(409);
+    const statusPath = '/api/v1/admin/applications/' + id + '/status';
+    expect((await request(app).patch(statusPath).set('Cookie', cookies[2]).send({ status: 'UNDER_REVIEW' })).status).toBe(200);
+    expect((await request(app).post('/api/v1/admin/applications/' + id + '/review').set('Cookie', cookies[2]).send({ employerSignature: true, employerStamp: true, studentApprovalEmpty: true, advisorApprovalEmpty: true })).status).toBe(200);
+    expect((await request(app).patch(statusPath).set('Cookie', cookies[2]).send({ status: 'APPROVED' })).status).toBe(409);
+    expect((await request(app).patch(statusPath).set('Cookie', cookies[2]).send({ status: 'INVALID', note: 'Belgedeki bilgileri düzeltin.' })).status).toBe(200);
+    const resubmit = await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'corrected.png', contentType: 'image/png' }); expect(resubmit.status).toBe(200);
+    const updated = await Application.findById(id); expect(updated?.status).toBe('UPLOADED'); expect(updated?.manualChecks).toBeNull(); expect(updated?.history.length).toBe(4);
+    expect(await Document.countDocuments({ application: id })).toBe(2);
+    const bad = await request(app).post('/api/v1/applications').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'fake.pdf', contentType: 'application/pdf' }); expect(bad.status).toBe(400);
+    expect(await Application.countDocuments({ student: ids[0] })).toBe(1);
+    // A final record cannot be changed, including through direct API calls.
+    await Application.updateOne({ _id: id }, { $set: { status: 'COMPLETED' } });
+    expect((await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'new.png', contentType: 'image/png' })).status).toBe(409);
+    expect((await request(app).get('/api/v1/admin/applications/completed').set('Cookie', cookies[2])).body.total).toBe(1);
+    const report = await ValidationReport.findOne({ application: id }); expect(report?.engineComplete).toBe(true);
+  } finally {
+    const created = await Application.find({ student: { $in: ids } }).select('_id'); appIds.push(...created.map(a => a._id));
+    const files = await Document.find({ application: { $in: appIds } }).select('+storageKey');
+    for (const file of files) await removePrivateFile(file.storageKey);
+    await Promise.all([Document.deleteMany({ application: { $in: appIds } }), ValidationReport.deleteMany({ application: { $in: appIds } }), Application.deleteMany({ _id: { $in: appIds } }), StudentProfile.deleteMany({ user: { $in: ids } }), Session.deleteMany({ user: { $in: ids } }), AuditLog.deleteMany({ user: { $in: ids } }), User.deleteMany({ _id: { $in: ids } })]);
+    await mongoose.disconnect();
+  }
+}, 180000);
