@@ -3,8 +3,14 @@ erDiagram
   User ||--o{ Session : owns
   User ||--o{ InternshipApplication : submits
   User ||--o{ ImportBatch : stages
+  User ||--o{ StudentReferenceRecord : imports
+  ImportBatch |o--o{ StudentReferenceRecord : source_metadata
   User ||--o{ AuditLog : acts
   InternshipApplication ||--|| Document : references
+  Document ||--o| DocumentExtraction : extracted_snapshot
+  InternshipApplication ||--o{ ComparisonReport : source_snapshots
+  InternshipApplication ||--o{ ApplicationRevision : admin_history
+  User ||--o{ ApplicationRevision : actor
   InternshipApplication ||--o| ValidationReport : produces
   InternshipApplication ||--o{ AuditLog : records
   User {
@@ -45,10 +51,53 @@ erDiagram
     boolean readyForApproval
     array results
   }
+  DocumentExtraction {
+    ObjectId documentId FK
+    number documentVersion
+    string documentHash
+    string extractorName
+    string templateVersion
+    boolean templateVerified
+    string status
+    string rawText
+    array extractedFields
+    array fieldSources
+  }
+  ComparisonReport {
+    ObjectId application FK
+    string sourceFingerprint
+    object sourceVersions
+    string engineVersion
+    array rows
+    boolean requiresManualReview
+    object manualReview
+  }
+  ApplicationRevision {
+    ObjectId application FK
+    ObjectId actor FK
+    number fromVersion
+    number toVersion
+    string operation
+    string reason
+    object before
+    object after
+  }
   ImportBatch {
     ObjectId owner FK
+    string purpose
     array rows
     date expiresAt
+  }
+  StudentReferenceRecord {
+    ObjectId _id PK
+    string studentNumber
+    number version
+    string fullName
+    string identityNumber
+    ObjectId importBatchId FK
+    string sourceFileName
+    number sourceRowNumber
+    ObjectId createdBy FK
   }
   AuditLog {
     ObjectId user FK

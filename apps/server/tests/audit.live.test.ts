@@ -1,3 +1,6 @@
+import { ApplicationRevision } from '../src/models/ApplicationRevision.js';
+import { ComparisonReport } from '../src/models/ComparisonReport.js';
+import { DocumentExtraction } from '../src/models/DocumentExtraction.js';
 import { expect, it, vi } from 'vitest';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
@@ -57,6 +60,9 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Audit Atlas: mass assignment, IDO
     expect((await request(app).post('/api/v1/applications').set('Cookie',a).send({})).status).toBe(400);
   } finally {
     vi.restoreAllMocks();const records=await Application.find({student:{$in:ids}}).select('_id');appIds.push(...records.map(r=>r._id));for(const doc of await Document.find({application:{$in:appIds}}).select('+storageKey'))await removePrivateFile(doc.storageKey);
+    await ApplicationRevision.deleteMany({ application: { $in: appIds } });
+    await ComparisonReport.deleteMany({ application: { $in: appIds } });
+    await DocumentExtraction.deleteMany({ documentId: { $in: await Document.find({ application: { $in: appIds } }).distinct('_id') } });
     await Promise.all([Document.deleteMany({application:{$in:appIds}}),ValidationReport.deleteMany({application:{$in:appIds}}),Application.deleteMany({_id:{$in:appIds}}),StudentProfile.deleteMany({user:{$in:ids}}),Session.deleteMany({user:{$in:ids}}),AuditLog.deleteMany({user:{$in:ids}}),User.deleteMany({_id:{$in:ids}})]);await mongoose.disconnect();
   }
 },240000);

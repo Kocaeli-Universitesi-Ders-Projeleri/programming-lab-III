@@ -13,14 +13,14 @@ export const User = model('User', userSchema);
 export const StudentProfile = model('StudentProfile', new Schema({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   studentNumber: { type: String, required: true, unique: true },
-  department: { type: String, required: true },
+  department: { type: String },
   nationality: String,
   phone: String,
   academicYear: String,
   identityNumber: { type: String, select: false, index: { unique: true, partialFilterExpression: { identityNumber: { $type: 'string' } } } },
   birthDate: { type: String, select: false },
   address: { type: String, select: false },
-  previousInternshipDays: { type: Number, default: 0 },
+  previousInternshipDays: { type: Number },
   healthStatus: { type: Number, min: 1, max: 6 },
 }, { timestamps: true }));
 const sessionSchema = new Schema({

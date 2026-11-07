@@ -1,91 +1,106 @@
 {
-  "frontendRouteCount": 17,
-  "backendEndpointCount": 27,
+  "frontendRouteCount": 20,
+  "backendEndpointCount": 39,
   "frontend": [
+    {
+      "path": "/register",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 18
+    },
     {
       "path": "/",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 16
+      "line": 18
     },
     {
       "path": "/privacy",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 16
+      "line": 18
     },
     {
       "path": "/cookies",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 16
+      "line": 18
     },
     {
       "path": "/login",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 16
+      "line": 18
     },
     {
       "path": "/admin",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 45
+      "line": 46
     },
     {
       "path": "/student",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 45
+      "line": 46
     },
     {
       "path": "/student/profile",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 46
+      "line": 47
     },
     {
       "path": "/admin/students",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 46
+      "line": 47
     },
     {
       "path": "/student/applications",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 47
+      "line": 48
     },
     {
       "path": "/admin/applications",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 47
+      "line": 48
     },
     {
       "path": "/student/completed",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 48
+      "line": 49
     },
     {
       "path": "/admin/completed",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 48
+      "line": 49
     },
     {
       "path": "/student/upload",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 49
+      "line": 50
     },
     {
       "path": "/admin/import",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 49
+      "line": 50
     },
     {
       "path": "/student/applications/:id/edit",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 50
+      "line": 51
+    },
+    {
+      "path": "/admin/applications/:id/edit",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 52
+    },
+    {
+      "path": "/admin/applications/:id/audit",
+      "file": "apps/client/src/pages/App.tsx",
+      "line": 53
     },
     {
       "path": "/student/applications/:id",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 51
+      "line": 54
     },
     {
       "path": "/admin/applications/:id",
       "file": "apps/client/src/pages/App.tsx",
-      "line": 51
+      "line": 54
     }
   ],
   "backend": [
@@ -93,151 +108,223 @@
       "method": "GET",
       "path": "/api/v1/auth/csrf",
       "file": "apps/server/src/app.ts",
-      "line": 26
+      "line": 27
     },
     {
       "method": "GET",
       "path": "/api/v1/health",
       "file": "apps/server/src/app.ts",
-      "line": 28
+      "line": 29
     },
     {
       "method": "GET",
       "path": "/api/v1/health/ready",
       "file": "apps/server/src/app.ts",
-      "line": 32
+      "line": 33
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/applications/:id",
+      "file": "apps/server/src/routes/adminApplications.ts",
+      "line": 35
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/applications/:id",
+      "file": "apps/server/src/routes/adminApplications.ts",
+      "line": 78
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/applications/:id/audit",
+      "file": "apps/server/src/routes/adminApplications.ts",
+      "line": 93
     },
     {
       "method": "GET",
       "path": "/api/v1/applications/calendar",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 29
+      "line": 36
     },
     {
       "method": "POST",
       "path": "/api/v1/applications/calculate-days",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 30
+      "line": 37
     },
     {
       "method": "POST",
       "path": "/api/v1/applications",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 72
+      "line": 84
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications/extract",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 85
     },
     {
       "method": "POST",
       "path": "/api/v1/applications/:id/documents",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 73
+      "line": 93
     },
     {
       "method": "GET",
       "path": "/api/v1/students/me/applications",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 81
+      "line": 101
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/applications",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 82
+      "line": 102
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/applications/completed",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 83
+      "line": 103
     },
     {
       "method": "GET",
       "path": "/api/v1/applications/:id",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 84
+      "line": 104
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/applications/:id",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 84
+      "line": 104
     },
     {
       "method": "GET",
       "path": "/api/v1/applications/:id/report",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 88
+      "line": 108
     },
     {
       "method": "GET",
-      "path": "/api/v1/documents/:id/download",
+      "path": "/api/v1/applications/:id/comparison",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 89
-    },
-    {
-      "method": "PATCH",
-      "path": "/api/v1/admin/applications/:id/status",
-      "file": "apps/server/src/routes/applications.ts",
-      "line": 98
+      "line": 116
     },
     {
       "method": "POST",
-      "path": "/api/v1/admin/applications/:id/review",
+      "path": "/api/v1/applications/:id/comparison",
       "file": "apps/server/src/routes/applications.ts",
       "line": 119
     },
     {
       "method": "POST",
+      "path": "/api/v1/admin/applications/:id/comparison-review",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 134
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/applications/:id/extraction",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 153
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/documents/:id/download",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 159
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/applications/:id/status",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 169
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/applications/:id/review",
+      "file": "apps/server/src/routes/applications.ts",
+      "line": 191
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/admin/applications/:id/validate",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 135
+      "line": 207
     },
     {
       "method": "GET",
       "path": "/api/v1/students/me/dashboard",
       "file": "apps/server/src/routes/applications.ts",
-      "line": 150
+      "line": 223
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 18
     },
     {
       "method": "POST",
       "path": "/api/v1/auth/login",
       "file": "apps/server/src/routes/auth.ts",
-      "line": 14
+      "line": 37
     },
     {
       "method": "GET",
       "path": "/api/v1/auth/me",
       "file": "apps/server/src/routes/auth.ts",
-      "line": 51
+      "line": 74
     },
     {
       "method": "POST",
       "path": "/api/v1/auth/logout",
       "file": "apps/server/src/routes/auth.ts",
-      "line": 52
+      "line": 75
     },
     {
       "method": "GET",
       "path": "/api/v1/students/me",
       "file": "apps/server/src/routes/auth.ts",
-      "line": 58
+      "line": 81
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/students/me",
+      "file": "apps/server/src/routes/auth.ts",
+      "line": 88
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/access",
       "file": "apps/server/src/routes/auth.ts",
-      "line": 63
+      "line": 104
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/students/import",
       "file": "apps/server/src/routes/imports.ts",
-      "line": 28
+      "line": 29
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/students/import/:id/confirm",
       "file": "apps/server/src/routes/imports.ts",
-      "line": 43
+      "line": 48
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/student-references",
+      "file": "apps/server/src/routes/imports.ts",
+      "line": 88
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/student-references/:id",
+      "file": "apps/server/src/routes/imports.ts",
+      "line": 107
     },
     {
       "method": "GET",

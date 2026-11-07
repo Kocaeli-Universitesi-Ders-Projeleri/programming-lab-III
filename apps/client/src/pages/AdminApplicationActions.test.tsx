@@ -1,0 +1,36 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AdminApplicationActions } from './AdminApplicationActions';
+import { ApplicationAudit } from './ApplicationAudit';
+import { api } from '../services/api';
+vi.mock('../services/api', () => ({ api: { delete: vi.fn(), get: vi.fn() } }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
+it('silmede gerekçe, checkbox ve son onay gerekir; iptalde API çağırmaz', async () => {
+  vi.mocked(api.delete).mockResolvedValue({ status: 200 });
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+  const cache = new QueryClient();
+  render(<QueryClientProvider client={cache}><MemoryRouter><Routes><Route path="/" element={<AdminApplicationActions id="record" version={4}/>}/><Route path="/admin/applications/record/audit" element={<h1>İşlem geçmişi</h1>}/></Routes></MemoryRouter></QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Başvuruyu sil' }));
+  const save = screen.getByRole('button', { name: 'Gerekçeli silmeyi onayla' });
+  expect(save.hasAttribute('disabled')).toBe(true);
+  fireEvent.change(screen.getByLabelText('Silme gerekçesi'), { target: { value: 'Mükerrer başvuru komisyonca kapatılacak.' } });
+  expect(save.hasAttribute('disabled')).toBe(true);
+  fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(save);
+  expect(confirm).toHaveBeenCalledTimes(1); expect(api.delete).not.toHaveBeenCalled();
+  fireEvent.click(save);
+  await screen.findByRole('heading', { name: 'İşlem geçmişi' });
+  expect(api.delete).toHaveBeenCalledWith('/admin/applications/record', { data: { version: 4, reason: 'Mükerrer başvuru komisyonca kapatılacak.', confirm: true }, timeout: 30000 });
+  cache.clear();
+});
+it('silinen kaydın audit görünümü kimliği maskeler ve metni escape eder', async () => {
+  vi.mocked(api.get).mockResolvedValue({ data: { application: { number: 'KOU-TEST', status: 'COMPLETED', version: 5, deletedAt: '2026-11-07', deletionReason: '<img src=x onerror=alert(1)>' }, items: [{ _id: 'revision', operation: 'UPDATE', fromVersion: 3, toVersion: 4, reason: 'Kimlik bilgisi düzeltildi.', createdAt: '2026-11-07', before: { data: { identityNumber: '10000000001' }, status: 'COMPLETED' }, after: { data: { identityNumber: '99000000001' }, status: 'UNDER_REVIEW' } }], total: 1, pageSize: 10, events: [] } });
+  const cache = new QueryClient();
+  render(<QueryClientProvider client={cache}><MemoryRouter initialEntries={['/admin/applications/record/audit']}><Routes><Route path="/admin/applications/:id/audit" element={<ApplicationAudit/>}/></Routes></MemoryRouter></QueryClientProvider>);
+  await screen.findByText(/Başvuru silinmiş olarak işaretlendi/);
+  expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeDefined(); expect(document.querySelector('img')).toBeNull();
+  expect(screen.queryByText('10000000001')).toBeNull(); expect(screen.queryByText('99000000001')).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Başvuru detayına dön' })).toBeNull();
+  cache.clear();
+});

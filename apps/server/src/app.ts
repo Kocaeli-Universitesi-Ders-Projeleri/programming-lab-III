@@ -4,6 +4,7 @@ import { authRoutes } from './routes/auth.js';
 import { panelRoutes } from './routes/panels.js';
 import { importRoutes } from './routes/imports.js';
 import { applicationRoutes } from './routes/applications.js';
+import { adminApplicationRoutes } from './routes/adminApplications.js';
 import { HttpError } from './utils/httpError.js';
 import { randomUUID } from 'node:crypto';
 import { configureHttpSecurity } from './middleware/httpSecurity.js';
@@ -33,6 +34,7 @@ app.get('/api/v1/health/ready', (_req, res) => res.status(databaseStatus() === '
 app.use('/api/v1', authRoutes);
 app.use('/api/v1', panelRoutes);
 app.use('/api/v1', importRoutes);
+app.use('/api/v1', adminApplicationRoutes);
 app.use('/api/v1', applicationRoutes);
 app.use('/api', (_req, res) => { res.status(404).json({ message: 'Endpoint bulunamadı.' }); });
 if (env.NODE_ENV === 'production') serveClient(app);

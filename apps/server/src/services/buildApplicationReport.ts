@@ -8,5 +8,5 @@ export async function buildApplicationReport(data: ApplicationInput, studentId: 
   const user = await User.findById(studentId).select('name').session(session ?? null).lean();
   const profile = await StudentProfile.findOne({ user: studentId }).select('+identityNumber +birthDate').session(session ?? null).lean();
   const options = await loadValidationOptions();
-  return new ValidationEngine().validate({ application: data, student: { name: user?.name, studentNumber: profile?.studentNumber, identityNumber: profile?.identityNumber, nationality: profile?.nationality, department: profile?.department, birthDate: profile?.birthDate }, options, manualChecks, today: todayInTurkey() });
+  return new ValidationEngine().validate({ policy: options.policy ?? 'VIZE', application: data, student: { name: user?.name, studentNumber: profile?.studentNumber, identityNumber: profile?.identityNumber, nationality: profile?.nationality, department: profile?.department, birthDate: profile?.birthDate }, options, manualChecks, today: todayInTurkey() });
 }

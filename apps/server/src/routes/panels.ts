@@ -10,9 +10,9 @@ panelRoutes.get('/admin/dashboard/stats', async (_req, res) => {
     StudentProfile.countDocuments(),
     StudentProfile.find().select('studentNumber department nationality phone academicYear user').sort({ createdAt: -1 }).limit(5).populate('user', 'name email').lean(),
     AuditLog.find({ event: { $in: ['LOGIN_SUCCESS', 'LOGOUT'] } }).select('event createdAt user').sort({ createdAt: -1 }).limit(5).populate('user', 'name').lean(),
-    Application.countDocuments(),
-    Application.aggregate<{ _id: string; count: number }>([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    Application.find().sort({ createdAt: -1 }).limit(5).select('number status createdAt').lean(),
+    Application.countDocuments({ deletedAt: null }),
+    Application.aggregate<{ _id: string; count: number }>([{ $match: { deletedAt: null } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Application.find({ deletedAt: null }).sort({ createdAt: -1 }).limit(5).select('number status createdAt').lean(),
   ]);
   res.json({ students, applications, applicationModuleReady: true, lastStudents, recentEvents, statusCounts, lastApplications });
 });

@@ -1,0 +1,25 @@
+flowchart TD
+  A[Authenticated student selects file] --> B[CSRF quota and heavy-work admission]
+  B --> C[Bounded safety worker]
+  C --> D{Safe signature MIME and structure?}
+  D -->|No| Reject[Reject safely]
+  D -->|Yes| E[Separate bounded extraction worker]
+  E --> F{Format}
+  F -->|DOCX| G[Ordered XML cells spans and paragraphs]
+  F -->|PDF| H[Text layer items and coordinates]
+  F -->|DOC| I[Buffer-based Word reader]
+  F -->|JPG or PNG| U[EXTRACTION_UNAVAILABLE without OCR]
+  G --> M[Explicit section and label-value mapping]
+  H --> M
+  I --> M
+  M --> N[Fields and missing or ambiguous states]
+  E -->|Timeout or parser failure| U
+  N --> P[Show result with unverified template warning]
+  U --> P
+  P --> Q{Student explicitly applies readable values?}
+  Q -->|Yes| R[Populate editable manual form only]
+  Q -->|No| S[Keep manual form unchanged]
+  R --> T[Submit file and manual data]
+  S --> T
+  T --> V[Server rechecks and extracts before transaction]
+  V --> W[Application.data separate from DocumentExtraction]

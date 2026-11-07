@@ -1,0 +1,33 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ComparisonResponse } from '@kou/shared';
+import { ComparisonView } from './ComparisonView';
+import { api } from '../services/api';
+vi.mock('../services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+const result = (state: 'STALE' | 'CURRENT'): ComparisonResponse => ({ state, sourceFingerprint: 'a'.repeat(64), sourceVersions: { formVersion: 1 }, approvalEligible: false, report: { sourceFingerprint: 'b'.repeat(64), sourceVersions: { formVersion: 1, documentVersion: 1, referenceVersion: null }, requiresManualReview: true, fullyMatched: false, summary: { matched: 0, mismatched: 0, incomplete: 1 }, rows: [{ fieldName: 'identityNumber', manualValue: '10000000001', documentValue: null, referenceValue: null, status: 'EXTRACTION_UNAVAILABLE', issues: ['EXTRACTION_UNAVAILABLE', 'REFERENCE_NOT_FOUND'], sources: { manual: 'PRESENT', document: 'UNAVAILABLE', reference: 'MISSING' }, pairs: [], explanation: '<img src=x onerror=alert(1)>' }] } });
+it('stale raporu açık gösterir, birden çok sorunu saklamaz ve kimliği maskeler', async () => {
+  vi.mocked(api.get).mockResolvedValue({ data: result('STALE') });
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={cache}><ComparisonView applicationId="record" admin status="UNDER_REVIEW" fieldLabels={{ identityNumber: 'Kimlik numarası' }}/></QueryClientProvider>);
+  await screen.findByText(/STALE — Kaynaklar değişti/);
+  expect(screen.getByText('Referans yok')).toBeDefined(); expect(screen.getByText('Belge okunamadı')).toBeDefined();
+  expect(screen.queryByText('10000000001')).toBeNull(); expect(screen.getByText('•••••••0001')).toBeDefined();
+  expect(document.querySelector('img')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Karşılaştırma incelemesini kaydet' })).toBeNull();
+  cache.clear();
+});
+it('gerekçe ve açık onay olmadan inceleme göndermez, kaynak parmak izini gönderir', async () => {
+  vi.mocked(api.get).mockResolvedValue({ data: result('CURRENT') }); vi.mocked(api.post).mockResolvedValue({ data: {} });
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={cache}><ComparisonView applicationId="record" admin status="UNDER_REVIEW" fieldLabels={{}}/></QueryClientProvider>);
+  const save = await screen.findByRole('button', { name: 'Karşılaştırma incelemesini kaydet' });
+  expect(save.hasAttribute('disabled')).toBe(true);
+  fireEvent.change(screen.getByLabelText('İnceleme gerekçesi'), { target: { value: 'Belgeyi ve referans farklarını manuel inceledim.' } });
+  expect(save.hasAttribute('disabled')).toBe(true);
+  fireEvent.click(screen.getByRole('checkbox'));
+  fireEvent.click(save);
+  await vi.waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/applications/record/comparison-review', { sourceFingerprint: 'a'.repeat(64), reason: 'Belgeyi ve referans farklarını manuel inceledim.', confirm: true }, { timeout: 30000 }));
+  cache.clear();
+});

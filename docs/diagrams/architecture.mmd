@@ -5,6 +5,14 @@ flowchart LR
   API --> CSRF[CSRF and input validation]
   API --> Limits[Per-user limits and admission]
   Limits --> Worker[Bounded inspection worker]
+  Worker --> Extractor[Bounded extraction worker and format strategies]
+  Extractor --> Snapshot[Raw text fields and provenance snapshot]
+  Snapshot --> Atlas
   API --> Rules[ValidationEngine]
+  API --> Compare[DocumentComparisonService]
+  Compare --> Sources[Account-anchored reference and aligned extraction]
+  Sources --> Atlas
+  Compare --> Freshness[Source fingerprint and manual review gate]
+  Freshness --> Rules
   API -->|TLS| Atlas[(MongoDB Atlas)]
   API --> Private[(Private files and SHA-256)]

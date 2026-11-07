@@ -1,0 +1,19 @@
+flowchart TD
+  A[Admin opens completed or active application] --> B[JWT DB role CSRF and quota]
+  B --> C{Command}
+  C -->|Update| D[Full validated form reason and expected version]
+  D --> E{New file?}
+  E -->|Yes| F[Existing safety extraction and private storage]
+  E -->|No| G[Keep original document]
+  F --> H[Transaction and optimistic version guard]
+  G --> H
+  H --> I[Store before and after ApplicationRevision plus audit]
+  I --> J[UNDER_REVIEW clear manual checks and invalidate validation]
+  J --> K[Old comparison STALE; regenerate and review before approval]
+  C -->|Delete| L[Reason expected version and explicit confirmation]
+  L --> M[Transaction sets deletedAt deletedBy and deletionReason]
+  M --> N[Store revision and audit; retain files and snapshots]
+  N --> O[Hide lists counts details reports and old downloads]
+  O --> P[Admin-only audit remains accessible]
+  H -->|Stale version| R[409 and rollback]
+  M -->|Stale version| R

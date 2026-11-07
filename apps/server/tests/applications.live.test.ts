@@ -1,3 +1,5 @@
+import { ApplicationRevision } from '../src/models/ApplicationRevision.js';
+import { ComparisonReport } from '../src/models/ComparisonReport.js';
 import { expect, it } from 'vitest';
 import request from './helpers/request.js';
 import mongoose from 'mongoose';
@@ -10,6 +12,8 @@ import { env } from '../src/config/env.js';
 import { User, StudentProfile, AuditLog, Session } from '../src/models/auth.js';
 import { Application, Document, ValidationReport } from '../src/models/application.js';
 import { removePrivateFile } from '../src/services/privateStorage.js';
+import { DocumentExtraction } from '../src/models/DocumentExtraction.js';
+import { docxFixture, docxMime } from './helpers/extractionFixtures.js';
 it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: Ek-16 yükleme, sahiplik, inceleme ve yeniden yükleme', async () => {
   await mongoose.connect(env.MONGODB_URI, { dbName: 'kou_staj_application_tests', serverSelectionTimeoutMS: 10000 });
   const prefix = randomUUID().replaceAll('-', '').slice(0, 12), password = randomUUID();
@@ -25,10 +29,19 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: Ek-16 yükleme, sahiplik, 
     }
     const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#fff' } }).png().toBuffer();
     const data: ApplicationInput = { name: 'Sentetik Test', studentNumber: prefix + '0', identityNumber: '10000000001', nationality: 'TR', department: 'Yazılım Mühendisliği', birthDate: '2003-01-15', academicYear: '2026-2027', semester: 'Yaz', previousInternshipDays: 0, email: prefix + '0@example.test', phone: '+905550000001', address: 'Örnek Mahallesi No:1 İzmit Kocaeli', healthStatus: 1, startDate: '2027-07-01', endDate: '2027-07-30', submissionDate: todayInTurkey(), workingDays: [1,2,3,4,5], declaredDays: countInternshipDays('2027-07-01', '2027-07-30', [1,2,3,4,5]).days!, companyName: 'Sentetik İşletme', abroad: false, serviceArea: 'Yazılım', companyPhone: '+905550000002', fax: '', companyEmail: 'company@example.test', website: '', employeeCount: 10, engineerCount: 5, engineerDepartments: '', paid: false, companyAddress: 'Örnek adres', employerName: 'Sentetik Yetkili', employerTitle: 'Mühendis', employerEmail: 'employer@example.test', employerPhone: '+905550000003' };
+    const docx = docxFixture([['Ad soyad', 'Belgedeki Farklı Ad'], ['Öğrenci no', data.studentNumber]]);
+    const preview = await request(app).post('/api/v1/applications/extract').set('Cookie', cookies[0]).attach('file', docx, { filename: 'ek16.docx', contentType: docxMime });
+    expect(preview.status).toBe(200); expect(preview.body.status).toBe('PARTIAL'); expect(preview.headers['cache-control']).toBe('no-store');
+    expect(await Application.countDocuments({ student: ids[0] })).toBe(0);
     const create = await request(app).post('/api/v1/applications').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'ek16.png', contentType: 'image/png' });
     expect(create.status).toBe(201); const id = create.body.id; appIds.push(new mongoose.Types.ObjectId(id));
     const detail = await request(app).get('/api/v1/applications/' + id).set('Cookie', cookies[0]); expect(detail.body.status).toBe('UPLOADED'); expect(detail.body.calculatedDays).toBe(data.declaredDays);
     const docId = detail.body.document._id;
+    const extractionPath = '/api/v1/applications/' + id + '/extraction';
+    expect((await request(app).get(extractionPath).set('Cookie', cookies[0])).body.status).toBe('EXTRACTION_UNAVAILABLE');
+    expect((await request(app).get(extractionPath).set('Cookie', cookies[1])).status).toBe(404);
+    expect((await request(app).get(extractionPath)).status).toBe(401);
+    expect((await request(app).get(extractionPath).set('Cookie', cookies[2])).status).toBe(200);
     expect((await request(app).get('/api/v1/applications/' + id).set('Cookie', cookies[1])).status).toBe(404);
     expect((await request(app).get('/api/v1/applications/' + id + '/report').set('Cookie', cookies[1])).status).toBe(404);
     expect((await request(app).get('/api/v1/documents/' + docId + '/download').set('Cookie', cookies[1])).status).toBe(404);
@@ -42,9 +55,16 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: Ek-16 yükleme, sahiplik, 
     expect((await request(app).post('/api/v1/admin/applications/' + id + '/review').set('Cookie', cookies[2]).send({ employerSignature: true, employerStamp: true, studentApprovalEmpty: true, advisorApprovalEmpty: true })).status).toBe(200);
     expect((await request(app).patch(statusPath).set('Cookie', cookies[2]).send({ status: 'APPROVED' })).status).toBe(409);
     expect((await request(app).patch(statusPath).set('Cookie', cookies[2]).send({ status: 'INVALID', note: 'Belgedeki bilgileri düzeltin.' })).status).toBe(200);
-    const resubmit = await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'corrected.png', contentType: 'image/png' }); expect(resubmit.status).toBe(200);
+    const resubmit = await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', docx, { filename: 'corrected.docx', contentType: docxMime }); expect(resubmit.status).toBe(200);
     const updated = await Application.findById(id); expect(updated?.status).toBe('UPLOADED'); expect(updated?.manualChecks).toBeNull(); expect(updated?.history.length).toBe(4);
     expect(await Document.countDocuments({ application: id })).toBe(2);
+    const extracted = await request(app).get(extractionPath).set('Cookie', cookies[0]);
+    expect(extracted.body.documentVersion).toBe(2);
+    expect(extracted.body.extractedFields.find((field: { fieldName: string }) => field.fieldName === 'name').rawValue).toBe('Belgedeki Farklı Ad');
+    expect(updated?.data.name).toBe(data.name);
+    const currentDocument = await Document.findById(updated!.document);
+    expect(extracted.body.documentHash).toBe(currentDocument!.sha256);
+    expect(await DocumentExtraction.countDocuments({ documentId: { $in: await Document.find({ application: id }).distinct('_id') } })).toBe(2);
     const bad = await request(app).post('/api/v1/applications').set('Cookie', cookies[0]).field('data', JSON.stringify(data)).attach('file', png, { filename: 'fake.pdf', contentType: 'application/pdf' }); expect(bad.status).toBe(400);
     expect(await Application.countDocuments({ student: ids[0] })).toBe(1);
     // A final record cannot be changed, including through direct API calls.
@@ -56,6 +76,9 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: Ek-16 yükleme, sahiplik, 
     const created = await Application.find({ student: { $in: ids } }).select('_id'); appIds.push(...created.map(a => a._id));
     const files = await Document.find({ application: { $in: appIds } }).select('+storageKey');
     for (const file of files) await removePrivateFile(file.storageKey);
+    await ApplicationRevision.deleteMany({ application: { $in: appIds } });
+    await ComparisonReport.deleteMany({ application: { $in: appIds } });
+    await DocumentExtraction.deleteMany({ documentId: { $in: await Document.find({ application: { $in: appIds } }).distinct('_id') } });
     await Promise.all([Document.deleteMany({ application: { $in: appIds } }), ValidationReport.deleteMany({ application: { $in: appIds } }), Application.deleteMany({ _id: { $in: appIds } }), StudentProfile.deleteMany({ user: { $in: ids } }), Session.deleteMany({ user: { $in: ids } }), AuditLog.deleteMany({ user: { $in: ids } }), User.deleteMany({ _id: { $in: ids } })]);
     await mongoose.disconnect();
   }

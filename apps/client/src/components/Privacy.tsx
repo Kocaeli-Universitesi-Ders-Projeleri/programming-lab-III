@@ -18,7 +18,7 @@ export function CookiePreferences({ children }: { children: ReactNode }) {
 }
 export function SiteFooter() {
   const manage = useContext(PreferenceContext), { pathname } = useLocation();
-  const publicPage = ['/', '/login', '/privacy', '/cookies', '/403', '/404', '/error'].includes(pathname);
+  const publicPage = ['/', '/register', '/login', '/privacy', '/cookies', '/403', '/404', '/error'].includes(pathname);
   return <footer className={`border-t border-slate-200 bg-background px-5 py-5 text-xs text-slate-500 ${publicPage ? '' : 'md:ml-72'}`}><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4"><span>Kocaeli Üniversitesi · Staj Yönetim Sistemi</span><nav aria-label="Bilgilendirme bağlantıları" className="flex flex-wrap gap-4"><Link to="/privacy" className="text-teal">Gizlilik</Link><Link to="/cookies" className="text-teal">Çerez bilgileri</Link><button type="button" className="text-teal" onClick={manage}>Çerez tercihleri</button></nav></div></footer>;
 }
 export function PrivacyPage({ cookies = false }: { cookies?: boolean }) {

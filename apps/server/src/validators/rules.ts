@@ -27,8 +27,8 @@ export class StudentMatchingRule extends ValidationRule {
       const field = key as keyof typeof fields;
       const expected = field === 'nationality' ? nationality(s[field]) : normalized(s[field]);
       const actual = field === 'nationality' ? nationality(a[field]) : normalized(a[field]);
-      if (!expected) return this.result('MATCH_' + key, 'Öğrenci eşleştirme', key, false, `${label} veri setinde eksik; eşleştirme yapılamadı.`, 'Staj komisyonundan kayıtlı öğrenci verisini düzeltmesini isteyin.', 'missing');
-      return this.result('MATCH_' + key, 'Öğrenci eşleştirme', key, actual === expected, actual === expected ? `${label} kayıtla eşleşiyor.` : `${label} kayıtlı öğrenci verisiyle uyuşmuyor.`, 'Formu kayıtlı öğrenci bilgilerinizle karşılaştırın.', !actual ? 'missing' : 'mismatch');
+      if (!expected) return this.result('MATCH_' + key, 'Hesap profili eşleştirme', key, false, `${label} hesap profilinde eksik; profil eşleştirmesi yapılamadı.`, 'Staj komisyonundan kayıtlı öğrenci verisini düzeltmesini isteyin.', 'missing');
+      return this.result('MATCH_' + key, 'Hesap profili eşleştirme', key, actual === expected, actual === expected ? `${label} kayıtla eşleşiyor.` : `${label} kayıtlı öğrenci verisiyle uyuşmuyor.`, 'Formu kayıtlı öğrenci bilgilerinizle karşılaştırın.', !actual ? 'missing' : 'mismatch');
     });
   }
 }

@@ -1,0 +1,26 @@
+sequenceDiagram
+  participant Student
+  participant UI as React Register
+  participant API as Express
+  participant DB as Atlas
+  Student->>UI: Name, student number, email, chosen password and confirmation
+  UI->>API: Obtain CSRF token
+  UI->>API: POST auth/register
+  API->>API: Strict schema, quotas and bounded concurrency
+  API->>API: bcrypt hash with 72-byte input guard
+  API->>DB: Begin transaction
+  API->>DB: Insert User with server-owned ROLE_STUDENT
+  API->>DB: Insert minimum StudentProfile and audit
+  alt Duplicate email or student number
+    API->>DB: Roll back all writes
+    API-->>UI: 409, no partial account
+  else Unique account
+    API->>DB: Commit
+    API-->>UI: 201, no password in response
+    UI->>UI: Navigate to login
+    Student->>API: Existing login with email and chosen password
+    API-->>Student: HttpOnly session cookie
+    Student->>API: Read dashboard with minimum profile
+    Student->>API: PATCH students/me with complete profile
+    API->>DB: Own profile update and audit in transaction
+  end

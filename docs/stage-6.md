@@ -1,5 +1,7 @@
 # Aşama 6 — Doğrulama motoru
 
+PHASE 5 güncellemesi: uygulama politikası `config/validation.json` içindeki VIZE/FINAL alanıyla seçilir (varsayılan VIZE). Temel form, dosya güvenliği, güncel/gerekçeli karşılaştırma ve dört komisyon kontrolü her zaman zorunludur. İleri kurallar VIZE'de bilgilendirici, FINAL'de engelleyicidir; sınıflar korunur. Policy'siz/eski motor sürümündeki raporlar onay için yeniden doğrulanmalıdır. Admin completed içerik düzeltmesi ayrı yetkili komutla yeniden incelemeye alır; öğrenci kilidi sürer. [Güncel rapor](vize-phase-5.md). Aşağıdaki ilk aşama açıklamaları tarihli FINAL kapsamını anlatır.
+
 ## Tamamlananlar
 
 OOP doğrulama motoru; alan bazında Türkçe hata, eksik bilgi, kayıt uyuşmazlığı, uyarı ve öneri üretir. Öğrenci veri setiyle eşleştirme, TC/YKN, telefon/e-posta/faks, ikametgâh ve işyeri adres bileşenleri, akademik yıl/yarıyıl, teslim tarihi, tatilli gün hesabı, mühendis sayısı ve dört manuel kontrol uygulanır.

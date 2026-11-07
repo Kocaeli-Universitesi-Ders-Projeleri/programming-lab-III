@@ -1,0 +1,23 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReferenceRecords } from './ReferenceRecords';
+import { api } from '../services/api';
+vi.mock('../services/api', () => ({ api: { get: vi.fn() } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('kayıtlı referansı inceler, kimliği maskeler ve HTML adını metin olarak gösterir', async () => {
+  const row = { _id: 'reference-id', studentNumber: '00123', fullName: '<img src=x onerror=alert(1)>', department: 'Yazılım', academicYear: '2026-2027', version: 2, sourceFileName: 'referans.csv', sourceRowNumber: 2 };
+  vi.mocked(api.get).mockImplementation(async url => ({ data: url === '/admin/student-references' ? { items: [row], total: 1, pageSize: 10 } : { ...row, identityNumber: '10000000001', nationality: 'TR', dateOfBirth: '2003-01-15', residenceAddress: 'Örnek adres', previousInternshipDays: 0, email: 'sample@example.test', phone: '+905550000000', healthCoverageStatus: 1 } }));
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={cache}><ReferenceRecords/></QueryClientProvider>);
+  await screen.findByText(row.fullName);
+  expect(document.querySelector('img')).toBeNull();
+  await userEvent.setup().click(screen.getByRole('button', { name: '00123 referansını incele' }));
+  await screen.findByText('•••••••0001');
+  expect(screen.queryByText('10000000001')).toBeNull();
+  expect(api.get).toHaveBeenCalledWith('/admin/student-references/reference-id');
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Kapat' }));
+  expect(screen.queryByRole('heading', { name: 'Referans ayrıntıları' })).toBeNull();
+  cache.clear();
+});

@@ -4,13 +4,23 @@
 
 `npm run dev` sonrasında http://localhost:5173/login adresini açın.
 
-Sentetik demo hesapları:
+Yeni öğrenciler `/register` üzerinden ad, öğrenci numarası, e-posta ve kendi şifreleriyle kayıt olur; ardından `/login` üzerinden e-posta ile giriş yapar. Profilin diğer alanları `/student/profile` ekranındaki düzenleme formundan tamamlanır. Referans veri seti hesap açmak için gerekli değildir.
+
+Kontrollü admin kurulumu: `npm.cmd run bootstrap:admin -w @kou/server` (eski `seed` komutu aynı admin-only işleminin alias'ıdır). `SEED_PASSWORD` 12 karakter/72 UTF-8 bayt sınırına uymalı. `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME` isteğe bağlı ayarlardır; production'da e-posta zorunludur. Aynı admin varsa bilgileri ve şifresi değiştirilmez; farklı mevcut hesapla çakışmada işlem durur. Bu komut öğrenci oluşturmaz.
+
+İsteğe bağlı sentetik öğrenci fixture'ı: `npm.cmd run seed:demo -w @kou/server`. Production'da çalışmaz; ayrı kontrollü test/geliştirme ortamında kullanın. Mevcut öğrenciye veya şifresine dokunmaz.
+
+Yalnız bu CLI işlemleri açıkça çalıştırılmışsa mevcut olabilecek demo hesapları:
 
 - Yönetici: `admin` veya `admin@example.test`
 - Öğrenci: `student` veya `student@example.test`
 - Her iki hesap için ilk oluşturma şifresi: yerel `.env` dosyasındaki `SEED_PASSWORD` değeri.
 
-Şifre kaynak koduna veya dokümana yazılmaz. Seed komutu mevcut hesap şifresini değiştirmez: `npm run seed -w @kou/server`. Yeni kurulumda en az 12 karakterli `SEED_PASSWORD` belirleyin. Seed yalnızca sentetik hesaplar oluşturur.
+Şifre kaynak koduna veya dokümana yazılmaz. Yeni öğrenciler için `SEED_PASSWORD` kullanılmaz; kendi seçtikleri parola bcrypt ile saklanır. Bootstrap/demo CLI'ları normal uygulama başlangıcında otomatik çalıştırılmaz. Bu geliştirme sırasında production bootstrap/demo komutu çalıştırılmadı.
+
+`POST /api/v1/auth/register` strict body kabul eder: name/studentNumber/email/password/confirmPassword. Rol ve kullanıcı adı sunucu tarafından belirlenir; role/admin/isActive gibi alanlar 400 ile reddedilir. User + minimum profil + audit transaction içindedir, unique çakışma 409'dur. Kayıt otomatik oturum açmaz; giriş ekranına yönlendirir. Kimlik/telefon/adres/sağlık için sahte varsayılan değer yazılmaz.
+
+`PATCH /api/v1/students/me` yalnız profil alanlarını kabul eder: department/nationality/phone/academicYear/identityNumber/birthDate/address/previousInternshipDays/healthStatus. Hesap adı, e-posta, öğrenci no, rol ve başka user ID'si değiştirilemez. Bu alanları değiştirmek için bu aşamada public API yoktur; parola reset/değiştirme de eklenmedi. Profil güncellemesi admin referans kaydını değiştirmez. Raporların kaynak/sürüm geçerliliği PHASE 4'te genişletilecektir.
 
 ## Güvenlik davranışları
 

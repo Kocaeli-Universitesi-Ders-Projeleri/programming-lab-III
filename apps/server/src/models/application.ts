@@ -7,8 +7,12 @@ export const Application = model('InternshipApplication', new Schema({
   calculatedDays: { type: Number, default: null },
   document: { type: Schema.Types.ObjectId, ref: 'Document', required: true },
   version: { type: Number, default: 1 },
+  formVersion: { type: Number, default: 1 },
   documentVersion: { type: Number, default: 1 },
   manualChecks: { type: Schema.Types.Mixed, default: null },
+  deletedAt: { type: Date, default: null, index: true },
+  deletedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  deletionReason: { type: String, select: false },
   history: [{ status: String, actor: { type: Schema.Types.ObjectId, ref: 'User' }, note: String, at: Date }],
 }, { timestamps: true }));
 export const Document = model('Document', new Schema({
@@ -19,13 +23,14 @@ export const Document = model('Document', new Schema({
   mime: { type: String, required: true }, size: Number, sha256: String,
 }, { timestamps: true }));
 export const ValidationReport = model('ValidationReport', new Schema({
+  policy: { type: String, enum: ['VIZE', 'FINAL'] },
   application: { type: Schema.Types.ObjectId, ref: 'InternshipApplication', required: true, unique: true },
   engineComplete: { type: Boolean, default: false },
   engineVersion: String,
   automatedPassed: { type: Boolean, default: false },
   readyForApproval: { type: Boolean, default: false },
   latestSubmissionDate: String,
-  results: [{ _id: false, ruleCode: String, category: String, field: String, valid: Boolean, severity: String, kind: String, message: String, suggestion: String }],
+  results: [{ _id: false, ruleCode: String, category: String, field: String, valid: Boolean, severity: String, kind: String, message: String, suggestion: String, blocking: Boolean }],
   pending: [String], suggestions: [String],
   summary: { passed: Number, errors: Number, warnings: Number, pending: Number },
   calculatedDays: { type: Number, default: null },

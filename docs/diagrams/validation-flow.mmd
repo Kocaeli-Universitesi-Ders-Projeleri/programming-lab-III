@@ -7,13 +7,16 @@ flowchart TD
   D --> E{Safe within resource bounds?}
   E -->|No| Reject
   E -->|Yes| F[Private file plus transactional metadata]
-  F --> G[ValidationEngine structured form checks]
-  G --> H{Automatic rules pass?}
-  H -->|No| I[INVALID and actionable report]
+  F --> G[ValidationEngine with server-owned VIZE or FINAL policy]
+  G --> H{Required checks pass?}
+  H -->|No| I[Report required problems; admin may request correction]
   H -->|Yes| J[UNDER_REVIEW]
   J --> K[Admin compares original and saves manual checks]
-  K --> L{Revalidation and all checks pass?}
+  K --> L{Current comparison reviewed and required policy checks pass?}
   L -->|No| J
   L -->|Yes| M[APPROVED]
   M --> N[Revalidate and complete]
-  N --> O[COMPLETED immutable]
+  N --> O[COMPLETED locked for student]
+  O -->|Admin reason and version| U[Privileged correction returns UNDER_REVIEW]
+  U --> J
+  O -->|Admin confirmed soft delete| S[Normal access closed; audit retained]

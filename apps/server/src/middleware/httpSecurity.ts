@@ -3,6 +3,14 @@ import helmet from 'helmet';
 import cors from 'cors';
 interface SecurityOptions { production: boolean; origin: string; trustedProxies: string[]; hstsMaxAge: number }
 export function configureHttpSecurity(app: Express, options: SecurityOptions) {
+  const allowedOrigins = new Set([options.origin]);
+  const configured = new URL(options.origin);
+  // Vite can be opened through either loopback name. Keep scheme and port fixed.
+  if (!options.production && ['localhost', '127.0.0.1', '[::1]'].includes(configured.hostname)) {
+    for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+      const local = new URL(configured); local.hostname = hostname; allowedOrigins.add(local.origin);
+    }
+  }
   app.set('trust proxy', options.trustedProxies.length ? options.trustedProxies : false);
   app.use(helmet({
     strictTransportSecurity: options.production && options.hstsMaxAge > 0 ? { maxAge: options.hstsMaxAge, includeSubDomains: false, preload: false } : false,
@@ -17,12 +25,12 @@ export function configureHttpSecurity(app: Express, options: SecurityOptions) {
       res.status(400).json({ message: 'Bu işlem HTTPS üzerinden yapılmalı.' }); return;
     }
     const origin = req.get('Origin');
-    if (origin && origin !== options.origin) { res.status(403).json({ message: 'İstek kaynağına izin verilmiyor.' }); return; }
+    if (origin && !allowedOrigins.has(origin)) { res.status(403).json({ message: 'İstek kaynağına izin verilmiyor.' }); return; }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.get('Sec-Fetch-Site') === 'cross-site') { res.status(403).json({ message: 'Siteler arası yazma isteği reddedildi.' }); return; }
-      if (!origin && req.get('Referer')) { let referer = ''; try { referer = new URL(req.get('Referer')!).origin; } catch { /* Invalid referers are rejected. */ } if (referer !== options.origin) { res.status(403).json({ message: 'İstek kaynağına izin verilmiyor.' }); return; } }
+      if (!origin && req.get('Referer')) { let referer = ''; try { referer = new URL(req.get('Referer')!).origin; } catch { /* Invalid referers are rejected. */ } if (!allowedOrigins.has(referer)) { res.status(403).json({ message: 'İstek kaynağına izin verilmiyor.' }); return; } }
     }
     next();
   });
-  app.use(cors({ origin: options.origin, credentials: true, methods: ['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token'], exposedHeaders: ['X-Request-ID'] }));
+  app.use(cors({ origin: [...allowedOrigins], credentials: true, methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token'], exposedHeaders: ['X-Request-ID'] }));
 }

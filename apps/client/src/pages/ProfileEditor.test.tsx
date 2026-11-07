@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ProfileEditor } from './ProfileEditor';
+import { api } from '../services/api';
+vi.mock('../services/api', () => ({ api: { patch: vi.fn() } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('boş profili sahte değerlerle doldurmaz ve tamamlanan alanları kaydeder', async () => {
+  vi.mocked(api.patch).mockResolvedValue({ status: 200 });
+  const cache = new QueryClient();
+  render(<QueryClientProvider client={cache}><ProfileEditor profile={{}} complete={false}/></QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Profil bilgilerimi düzenle' }));
+  expect((screen.getByLabelText('Önceden yapılan staj günü') as HTMLInputElement).value).toBe('');
+  expect((screen.getByLabelText('Sağlık yardımı statüsü (1–6)') as HTMLInputElement).value).toBe('');
+  for (const [label, value] of [['Bölüm', 'Yazılım Mühendisliği'], ['Uyruk', 'TR'], ['Telefon', '+905550000001'], ['Öğretim yılı', '2026-2027'], ['TC / yabancı kimlik numarası', '10000000001'], ['Doğum tarihi', '2003-01-15'], ['İkametgâh adresi', 'Örnek adres'], ['Önceden yapılan staj günü', '0'], ['Sağlık yardımı statüsü (1–6)', '1']]) fireEvent.change(screen.getByLabelText(label!), { target: { value } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Profilimi kaydet' }).closest('form')!);
+  await vi.waitFor(() => expect(api.patch).toHaveBeenCalledWith('/students/me', expect.objectContaining({ department: 'Yazılım Mühendisliği', previousInternshipDays: 0, healthStatus: 1 })));
+  expect(vi.mocked(api.patch).mock.calls[0]![1]).not.toHaveProperty('user');
+  cache.clear();
+});

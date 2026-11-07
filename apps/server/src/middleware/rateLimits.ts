@@ -5,6 +5,20 @@ const message = { message: 'Çok fazla istek gönderildi. Lütfen biraz bekleyip
 export const generalLimit = rateLimit({ windowMs: 60000, limit: 10000, standardHeaders: 'draft-7', legacyHeaders: false, message });
 export const loginIpLimit = rateLimit({ windowMs: 15 * 60000, limit: 1000, standardHeaders: 'draft-7', legacyHeaders: false, message });
 export const loginAccountLimit = rateLimit({ windowMs: 15 * 60000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false, message, keyGenerator: req => createHash('sha256').update(typeof req.body?.identifier === 'string' ? req.body.identifier.trim().toLowerCase() : 'invalid').digest('hex') });
+export const registrationIpLimit = rateLimit({ windowMs: 60 * 60000, limit: 1000, standardHeaders: 'draft-7', legacyHeaders: false, message });
+export const registrationIdentityLimit = rateLimit({ windowMs: 60 * 60000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message,
+  keyGenerator: req => createHash('sha256').update(typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : 'invalid').digest('hex') });
+export function anonymousWorkAdmission(maxTotal = 2) {
+  let running = 0;
+  return (_req: Request, res: Response, next: NextFunction) => {
+    if (running >= maxTotal) { res.setHeader('Retry-After', '5'); res.status(429).json(message); return; }
+    running++; let released = false;
+    const release = () => { if (!released) { released = true; running--; } };
+    res.locals.releaseHeavyWork = release;
+    res.once('finish', release); res.once('close', () => { if (!res.locals.heavyProcessing) release(); });
+    next();
+  };
+}
 export function userLimit(limit: number, windowMs: number) { return rateLimit({ limit, windowMs, message, standardHeaders: 'draft-7', legacyHeaders: false, keyGenerator: req => req.authUser?.id ?? 'unauthenticated' }); }
 export const uploadLimit = userLimit(10, 15 * 60000);
 export const adminWriteLimit = userLimit(60, 60000);

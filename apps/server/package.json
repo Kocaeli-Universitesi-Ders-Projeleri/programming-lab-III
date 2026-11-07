@@ -10,9 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "tsx src/seed.ts",
+    "bootstrap:admin": "tsx src/seed.ts",
+    "seed:demo": "tsx src/seedDemoData.ts",
     "predev": "npm run build"
   },
   "dependencies": {
+    "@kou/shared": "*",
     "bcrypt": "^6.0.0",
     "cfb": "^1.2.2",
     "cookie-parser": "^1.4.7",
@@ -22,18 +25,20 @@
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
+    "fast-xml-parser": "^5.12.0",
     "file-type": "^22.3.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.14.0",
     "multer": "^2.5.0",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.5.438",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "sharp": "^0.35.5",
+    "word-extractor": "^1.0.4",
     "yauzl": "^3.4.0",
-    "zod": "^4.6.7",
-    "@kou/shared": "*"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

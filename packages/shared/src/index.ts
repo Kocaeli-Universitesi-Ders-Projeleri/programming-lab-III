@@ -8,3 +8,6 @@ export interface HealthResponse {
 export * from './internship.js';
 export * from './application.js';
 export * from './validation.js';
+export * from './account.js';
+export * from './extraction.js';
+export * from './comparison.js';

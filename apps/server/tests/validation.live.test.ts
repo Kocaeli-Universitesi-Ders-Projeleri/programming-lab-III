@@ -1,4 +1,8 @@
-import { expect, it } from 'vitest';
+import { ApplicationRevision } from '../src/models/ApplicationRevision.js';
+import { ComparisonReport } from '../src/models/ComparisonReport.js';
+import { DocumentExtraction } from '../src/models/DocumentExtraction.js';
+import { expect, it, vi } from 'vitest';
+import * as validationConfig from '../src/config/validation.js';
 import request from './helpers/request.js';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
@@ -15,6 +19,8 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: güncel doğrulama ve manu
   await mongoose.connect(env.MONGODB_URI, { dbName: 'kou_staj_validation_tests', serverSelectionTimeoutMS: 10000 });
   const ids: mongoose.Types.ObjectId[] = [], appIds: mongoose.Types.ObjectId[] = [];
   const prefix = randomUUID().replaceAll('-', '').slice(0, 12), password = randomUUID();
+  const options = await validationConfig.loadValidationOptions();
+  const policySpy = vi.spyOn(validationConfig, 'loadValidationOptions').mockResolvedValue({ ...options, policy: 'FINAL' });
   try {
     await Promise.all([User.init(), StudentProfile.init(), Application.init(), Document.init(), ValidationReport.init(), Session.init(), AuditLog.init()]);
     const data = validationFixture().application;
@@ -28,7 +34,7 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: güncel doğrulama ve manu
     const created = await request(app).post('/api/v1/applications').set('Cookie', studentCookie).field('data', JSON.stringify(data)).attach('file', png, { filename: 'sentetik-ek16.png', contentType: 'image/png' }); expect(created.status).toBe(201);
     const id = created.body.id; appIds.push(new mongoose.Types.ObjectId(id));
     const path = '/api/v1/admin/applications/' + id;
-    const report = await ValidationReport.findOne({ application: id }); expect(report?.engineVersion).toBe('1.0.0'); expect(report?.automatedPassed).toBe(true); expect(report?.pending).toHaveLength(4); expect(report?.readyForApproval).toBe(false);
+    const report = await ValidationReport.findOne({ application: id }); expect(report?.engineVersion).toBe('1.1.0'); expect(report?.policy).toBe('FINAL'); expect(report?.automatedPassed).toBe(true); expect(report?.pending).toHaveLength(4); expect(report?.readyForApproval).toBe(false);
     expect((await request(app).post(path + '/validate').set('Cookie', studentCookie).send({})).status).toBe(403);
     // Existing stage-5 reports can be regenerated without editing their original documents.
     await ValidationReport.updateOne({ application: id }, { $set: { engineComplete: false }, $unset: { engineVersion: 1 } });
@@ -40,6 +46,8 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: güncel doğrulama ve manu
     expect((await request(app).post(path + '/review').set('Cookie', adminCookie).send({ ...positiveManualChecks, employerStamp: false })).status).toBe(200);
     expect((await status('APPROVED')).status).toBe(409);
     expect((await request(app).post(path + '/review').set('Cookie', adminCookie).send(positiveManualChecks)).status).toBe(200);
+    const comparison = await request(app).get('/api/v1/applications/' + id + '/comparison').set('Cookie', adminCookie);
+    expect((await request(app).post(path + '/comparison-review').set('Cookie', adminCookie).send({ confirm: true, sourceFingerprint: comparison.body.sourceFingerprint, reason: 'Belgeyi ve eksik otomatik okuma kaynaklarını manuel inceledim.' })).status).toBe(200);
     expect((await ValidationReport.findOne({ application: id }))?.readyForApproval).toBe(true);
     // A previously passing report must never authorize approval against changed registry data.
     await StudentProfile.updateOne({ _id: profile._id }, { $set: { department: 'Farklı Bölüm' } });
@@ -60,8 +68,12 @@ it.skipIf(process.env.LIVE_AUTH_TEST !== '1')('Atlas: güncel doğrulama ve manu
     expect((await request(app).post('/api/v1/applications/' + id + '/documents').set('Cookie', studentCookie).field('data', JSON.stringify(data)).attach('file', png, { filename: 'new.png', contentType: 'image/png' })).status).toBe(409);
     expect(await AuditLog.countDocuments({ user: admin._id, event: 'APPLICATION_STATUS_APPROVED' })).toBe(1); expect(await AuditLog.countDocuments({ user: admin._id, event: 'APPLICATION_STATUS_COMPLETED' })).toBe(1);
   } finally {
+    policySpy.mockRestore();
     const records = await Application.find({ student: { $in: ids } }).select('_id'); appIds.push(...records.map(a => a._id));
     for (const doc of await Document.find({ application: { $in: appIds } }).select('+storageKey')) await removePrivateFile(doc.storageKey);
+    await ApplicationRevision.deleteMany({ application: { $in: appIds } });
+    await ComparisonReport.deleteMany({ application: { $in: appIds } });
+    await DocumentExtraction.deleteMany({ documentId: { $in: await Document.find({ application: { $in: appIds } }).distinct('_id') } });
     await Promise.all([Document.deleteMany({ application: { $in: appIds } }), ValidationReport.deleteMany({ application: { $in: appIds } }), Application.deleteMany({ _id: { $in: appIds } }), StudentProfile.deleteMany({ user: { $in: ids } }), Session.deleteMany({ user: { $in: ids } }), AuditLog.deleteMany({ user: { $in: ids } }), User.deleteMany({ _id: { $in: ids } })]);
     await mongoose.disconnect();
   }

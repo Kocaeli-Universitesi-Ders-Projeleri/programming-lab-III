@@ -1,3 +1,4 @@
+export type ValidationPolicy = 'VIZE' | 'FINAL';
 export interface ManualChecks {
   employerSignature: boolean;
   employerStamp: boolean;
@@ -5,6 +6,7 @@ export interface ManualChecks {
   advisorApprovalEmpty: boolean;
 }
 export interface RuleResult {
+  blocking?: boolean;
   ruleCode: string;
   category: string;
   field: string;
@@ -15,6 +17,8 @@ export interface RuleResult {
   suggestion?: string;
 }
 export interface ApplicationValidationReport {
+  policy?: ValidationPolicy;
+  policyStale?: boolean;
   engineVersion: string;
   engineComplete: boolean;
   automatedPassed: boolean;

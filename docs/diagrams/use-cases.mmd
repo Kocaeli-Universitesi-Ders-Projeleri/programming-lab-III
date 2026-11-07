@@ -1,11 +1,17 @@
 flowchart LR
   Student[Student] --> Login[Login and logout]
+  Student --> Registration[Create own student account]
+  Student --> EditProfile[Complete own profile]
   Admin[Commission admin] --> Login
   Student --> Profile[Read own profile]
   Student --> Upload[Submit or edit own Ek-16]
   Student --> Report[Read own report and download own document]
-  Admin --> Import[Preview and confirm dataset import]
+  Admin --> Import[Preview and confirm reference dataset import]
+  Admin --> References[View independent reference records]
   Admin --> Lists[Read student and application lists]
   Admin --> Review[Review original and manual checks]
   Review --> Approval[Approve and complete after validation]
   Admin --> Recheck[Revalidate report]
+  Admin --> Correct[Reasoned update of completed records]
+  Admin --> Delete[Confirmed soft delete with version guard]
+  Admin --> History[View before and after revision audit]

@@ -1,30 +1,31 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { uploadLimit, adminWriteLimit, admitHeavyWork, withHeavyWork } from '../middleware/rateLimits.js';
 import { objectIdSchema } from '../middleware/requestValidation.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { User, StudentProfile, AuditLog } from '../models/auth.js';
+import { AuditLog } from '../models/auth.js';
+import { StudentProfile } from '../models/auth.js';
+import { Application } from '../models/application.js';
 import { ImportBatch } from '../models/ImportBatch.js';
+import { StudentReferenceRecord } from '../models/StudentReferenceRecord.js';
 import { ImportError, inspectImport } from '../services/inspection.js';
-import type { PreviewRow } from '../services/importParser.js';
 import { safeFilename } from '../services/filename.js';
+import { HttpError } from '../utils/httpError.js';
+
 export const importRoutes = Router();
-importRoutes.use('/admin/students/import', authenticate, authorize('ROLE_ADMIN'));
+importRoutes.use(['/admin/students/import', '/admin/student-references'], authenticate, authorize('ROLE_ADMIN'));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 } });
-async function markExisting(rows: PreviewRow[], session?: mongoose.ClientSession) {
-  const profiles = await StudentProfile.find({ $or: [{ studentNumber: { $in: rows.map(r => r.data.studentNumber) } }, { identityNumber: { $in: rows.map(r => r.data.identityNumber) } }] }).select('studentNumber +identityNumber').session(session ?? null).lean();
-  const users = await User.find({ $or: [{ email: { $in: rows.map(r => String(r.data.email).toLowerCase()) } }, { username: { $in: rows.map(r => 'student-' + String(r.data.studentNumber).toLowerCase()) } }] }).select('email username').session(session ?? null).lean();
-  for (const row of rows) {
-    if (profiles.some(p => p.studentNumber === row.data.studentNumber)) row.errors.push('Öğrenci numarası zaten kayıtlı');
-    if (profiles.some(p => p.identityNumber === row.data.identityNumber)) row.errors.push('Kimlik numarası zaten kayıtlı');
-    if (users.some(u => u.email === String(row.data.email).toLowerCase())) row.errors.push('E-posta zaten kayıtlı');
-    if (users.some(u => u.username === 'student-' + String(row.data.studentNumber).toLowerCase())) row.errors.push('Kullanıcı adı zaten kayıtlı');
-  }
+
+async function referenceVersions(studentNumbers: string[], session?: mongoose.ClientSession) {
+  const versions = await StudentReferenceRecord.aggregate<{ _id: string; version: number }>([
+    { $match: { studentNumber: { $in: studentNumbers } } },
+    { $group: { _id: '$studentNumber', version: { $max: '$version' } } },
+  ]).session(session ?? null);
+  return new Map(versions.map(row => [row._id, row.version]));
 }
+
 importRoutes.post('/admin/students/import', uploadLimit, admitHeavyWork, (req, res, next) => {
   upload.single('file')(req, res, error => {
     if (error) { res.status(400).json({ message: 'Tek bir dosya yükleyin. Dosya boyutu en fazla 5 MB olabilir.' }); return; }
@@ -35,47 +36,77 @@ importRoutes.post('/admin/students/import', uploadLimit, admitHeavyWork, (req, r
     if (!req.file || req.file.size < 4) throw new ImportError('CSV veya XLSX dosyası seçin.');
     const filename = safeFilename(req.file.originalname);
     const rows = await inspectImport(req.file.buffer, filename, req.file.mimetype);
-    await markExisting(rows);
-    const batch = await ImportBatch.create({ owner: req.authUser!.id, filename, rows: rows.map(r => ({ line: r.line, data: r.data, issues: r.errors })), expiresAt: new Date(Date.now() + 60 * 60000) });
-    res.status(201).json({ id: batch.id, filename: batch.filename, rows, valid: rows.filter(r => !r.errors.length).length, invalid: rows.filter(r => r.errors.length).length, expiresAt: batch.expiresAt });
+    const versions = await referenceVersions(rows.filter(row => !row.errors.length).map(row => String(row.data.studentNumber)));
+    const batch = await ImportBatch.create({ owner: req.authUser!.id, purpose: 'REFERENCE', filename,
+      rows: rows.map(row => ({ line: row.line, data: row.data, issues: row.errors, referenceVersion: versions.get(String(row.data.studentNumber)) ?? 0 })),
+      expiresAt: new Date(Date.now() + 60 * 60000) });
+    res.status(201).json({ id: batch.id, filename, rows: rows.map(row => ({ ...row, nextVersion: (versions.get(String(row.data.studentNumber)) ?? 0) + 1 })),
+      valid: rows.filter(row => !row.errors.length).length, invalid: rows.filter(row => row.errors.length).length, expiresAt: batch.expiresAt });
   } catch (error) { if (error instanceof ImportError) { res.status(400).json({ message: error.message }); return; } throw error; }
 }));
+
 importRoutes.post('/admin/students/import/:id/confirm', adminWriteLimit, admitHeavyWork, withHeavyWork(async (req, res) => {
-  if (!objectIdSchema.safeParse(req.params.id).success || !z.object({ confirm: z.literal(true) }).strict().safeParse(req.body).success) { res.status(400).json({ message: 'Geçerli aktarım ve açık onay gerekli.' }); return; }
+  if (!objectIdSchema.safeParse(req.params.id).success || !z.object({ confirm: z.literal(true) }).strict().safeParse(req.body).success) throw new HttpError(400, 'Geçerli aktarım ve açık onay gerekli.');
   const batch = await ImportBatch.findOne({ _id: req.params.id, owner: req.authUser!.id, expiresAt: { $gt: new Date() } }).select('+rows');
-  if (!batch) { res.status(404).json({ message: 'Aktarım bulunamadı veya süresi dolmuş.' }); return; }
-  if (batch.status === 'COMMITTED') { res.json({ ...batch.result, credentials: [], alreadyCommitted: true }); return; }
-  const rows: PreviewRow[] = batch.rows.map(r => ({ line: r.line!, data: r.data, errors: [...r.issues] }));
-  const candidates = rows.filter(r => !r.errors.length);
-  if (!candidates.length) { res.status(400).json({ message: 'Kaydedilebilecek geçerli satır yok.' }); return; }
-  await Promise.all([User.init(), StudentProfile.init(), ImportBatch.init()]);
-  // Password hashing is performed before the transaction to keep its duration short.
-  const accounts = new Map<number, { id: mongoose.Types.ObjectId; username: string; password: string; passwordHash: string }>();
-  for (let i = 0; i < candidates.length; i += 8) await Promise.all(candidates.slice(i, i + 8).map(async row => {
-    const password = 'Kou_' + randomBytes(18).toString('base64url');
-    accounts.set(row.line, { id: new mongoose.Types.ObjectId(), username: 'student-' + String(row.data.studentNumber).toLowerCase(), password, passwordHash: await bcrypt.hash(password, 12) });
-  }));
+  if (!batch) throw new HttpError(404, 'Aktarım bulunamadı veya süresi dolmuş.');
+  if (batch.purpose !== 'REFERENCE') throw new HttpError(409, 'Bu önizleme eski hesap aktarımına ait. Referans kaydı için dosyayı yeniden yükleyin.');
+  if (batch.status === 'COMMITTED') { res.json({ ...batch.result, alreadyCommitted: true }); return; }
+  const accepted = batch.rows.filter(row => !row.issues.length);
+  if (!accepted.length) throw new HttpError(400, 'Kaydedilebilecek geçerli satır yok.');
+  await Promise.all([StudentReferenceRecord.init(), ImportBatch.init()]);
   const session = await mongoose.startSession();
-  let result: { successful: number; failed: number; failures: { line: number; errors: string[] }[] } | undefined;
-  let credentials: { studentNumber: string; username: string; password: string }[] = [];
+  const result = { successful: accepted.length, failed: batch.rows.length - accepted.length,
+    failures: batch.rows.filter(row => row.issues.length).map(row => ({ line: row.line, errors: row.issues })) };
   try {
     await session.withTransaction(async () => {
-      const claimed = await ImportBatch.findOneAndUpdate({ _id: batch._id, status: 'PREVIEW', expiresAt: { $gt: new Date() } }, { $set: { status: 'COMMITTED' } }, { session, new: true });
+      const claimed = await ImportBatch.findOneAndUpdate({ _id: batch._id, purpose: 'REFERENCE', status: 'PREVIEW', expiresAt: { $gt: new Date() } }, { $set: { status: 'COMMITTED' } }, { session, new: true });
       if (!claimed) throw new ImportError('Aktarım daha önce onaylanmış veya süresi dolmuş.');
-      const checked: PreviewRow[] = rows.map(r => ({ ...r, errors: [...r.errors] }));
-      await markExisting(checked, session);
-      const accepted = checked.filter(r => !r.errors.length);
-      const users = accepted.map(r => { const data = r.data; const a = accounts.get(r.line)!; return { _id: a.id, username: a.username, email: data.email, name: data.name, role: 'ROLE_STUDENT', passwordHash: a.passwordHash }; });
-      const profiles = accepted.map(r => { const { name: _name, email: _email, ...data } = r.data; return { ...data, user: accounts.get(r.line)!.id }; });
-      if (users.length) { await User.insertMany(users, { session }); await StudentProfile.insertMany(profiles, { session }); }
-      result = { successful: accepted.length, failed: checked.length - accepted.length, failures: checked.filter(r => r.errors.length).map(r => ({ line: r.line, errors: r.errors })) };
-      credentials = accepted.map(r => { const a = accounts.get(r.line)!; return { studentNumber: String(r.data.studentNumber), username: a.username, password: a.password }; });
+      const versions = await referenceVersions(accepted.map(row => String(row.data.studentNumber)), session);
+      if (accepted.some(row => (versions.get(String(row.data.studentNumber)) ?? 0) !== row.referenceVersion)) throw new ImportError('Referans sürümü önizlemeden sonra değişti.');
+      const records = accepted.map(row => {
+        const d = row.data;
+        return { studentNumber: d.studentNumber, fullName: d.name, identityNumber: d.identityNumber, nationality: d.nationality,
+          dateOfBirth: d.birthDate, residenceAddress: d.address, department: d.department, academicYear: d.academicYear,
+          previousInternshipDays: d.previousInternshipDays, email: d.email, phone: d.phone, healthCoverageStatus: d.healthStatus,
+          importBatchId: batch._id, sourceFileName: batch.filename, sourceRowNumber: row.line, version: row.referenceVersion! + 1, createdBy: req.authUser!.id };
+      });
+      await StudentReferenceRecord.insertMany(records, { session });
+      // Serialize reference changes against approvals and snapshot generation.
+      // Only the optimistic version changes; submitted data/status/files stay intact.
+      const profiles = await StudentProfile.find({ studentNumber: { $in: accepted.map(row => String(row.data.studentNumber)) } }).select('user').session(session).lean();
+      await Application.updateMany({ student: { $in: profiles.map(profile => profile.user) }, deletedAt: null }, { $inc: { version: 1 } }, { session });
       await ImportBatch.updateOne({ _id: batch._id }, { $set: { result }, $unset: { rows: 1 } }, { session });
-      await AuditLog.create([{ user: req.authUser!.id, event: 'STUDENT_IMPORT_COMMITTED', ip: req.ip }], { session });
+      await AuditLog.create([{ user: req.authUser!.id, event: 'REFERENCE_IMPORT_COMMITTED', details: { batchId: batch._id, successful: result.successful, failed: result.failed }, ip: req.ip }], { session });
     });
-    res.json({ ...result, credentials });
+    res.json(result);
   } catch (error) {
-    if (error instanceof ImportError || (error as { code?: number }).code === 11000) { res.status(409).json({ message: 'Aktarım tamamlanamadı. Eşzamanlı değişiklik olabilir; dosyayı yeniden önizleyin. Hiçbir kısmi kayıt yapılmadı.' }); return; }
+    if (error instanceof ImportError || (error as { code?: number }).code === 11000) throw new HttpError(409, 'Aktarım tamamlanamadı. Referans sürümü değişmiş veya aktarım onaylanmış olabilir; dosyayı yeniden önizleyin. Hiçbir kısmi kayıt yapılmadı.');
     throw error;
   } finally { await session.endSession(); }
 }));
+
+importRoutes.get('/admin/student-references', async (req, res) => {
+  const parsed = z.object({ q: z.string().trim().max(100).default(''), page: z.coerce.number().int().min(1).max(100000).default(1) }).safeParse(req.query);
+  if (!parsed.success) throw new HttpError(400, 'Arama veya sayfa geçersiz.');
+  const { q, page } = parsed.data;
+  const search = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  // Aggregate does not apply Mongoose select:false: project before grouping.
+  const [result] = await StudentReferenceRecord.aggregate([
+    { $project: { studentNumber: 1, fullName: 1, department: 1, academicYear: 1, sourceFileName: 1, sourceRowNumber: 1, version: 1, createdAt: 1 } },
+    { $sort: { studentNumber: 1, version: -1 } },
+    { $group: { _id: '$studentNumber', record: { $first: '$$ROOT' } } },
+    { $replaceRoot: { newRoot: '$record' } },
+    ...(q ? [{ $match: { $or: [{ studentNumber: search }, { fullName: search }] } }] : []),
+    { $sort: { studentNumber: 1 } },
+    { $facet: { items: [{ $skip: (page - 1) * 10 }, { $limit: 10 }], count: [{ $count: 'total' }] } },
+  ]);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ items: result?.items ?? [], total: result?.count[0]?.total ?? 0, page, pageSize: 10 });
+});
+
+importRoutes.get('/admin/student-references/:id', async (req, res) => {
+  if (!objectIdSchema.safeParse(req.params.id).success) throw new HttpError(404, 'Referans kaydı bulunamadı.');
+  const record = await StudentReferenceRecord.findById(req.params.id).select('+identityNumber +dateOfBirth +residenceAddress +healthCoverageStatus').lean();
+  if (!record) throw new HttpError(404, 'Referans kaydı bulunamadı.');
+  res.setHeader('Cache-Control', 'no-store'); res.json(record);
+});

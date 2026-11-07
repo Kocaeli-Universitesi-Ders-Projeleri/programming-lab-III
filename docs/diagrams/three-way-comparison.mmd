@@ -1,0 +1,22 @@
+flowchart TD
+  A[Load current application manual data] --> B[Load current document and aligned extraction]
+  B --> C[Resolve account-owned student number]
+  C --> D[Latest exact reference version or missing or ambiguous]
+  D --> E[Normalize fields without fuzzy identity matching]
+  E --> F{Student field?}
+  F -->|Yes| G[Compare A-B A-C and B-C]
+  F -->|No| H[Compare A-B only; C not applicable]
+  G --> I[Keep every source state and issue]
+  H --> I
+  I --> J[Snapshot bound to form document extraction and reference hashes]
+  J --> K{Fingerprint equals current sources?}
+  K -->|No| Stale[STALE; block approval]
+  K -->|Yes| L{All reliable or justified admin review?}
+  L -->|No| Review[Manual review required; no fake MATCH]
+  L -->|Yes| M[Existing validation and signature checks still apply]
+  Review --> N[Admin records reason and confirms exact fingerprint]
+  N --> M
+  M --> O[Recheck inside approval transaction]
+  O --> P{Concurrent source change?}
+  P -->|Yes| Stale
+  P -->|No| Q[Commit only valid status transition]

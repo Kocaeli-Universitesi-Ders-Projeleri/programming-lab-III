@@ -9,6 +9,7 @@ export interface ValidationStudent {
   birthDate?: string | null;
 }
 export interface ValidationContext {
+  policy?: 'VIZE' | 'FINAL';
   application: ApplicationInput;
   student: ValidationStudent;
   manualChecks?: Partial<ManualChecks> | null;

@@ -21,3 +21,21 @@ classDiagram
   ValidationRule <|-- EngineerValidationRule
   ValidationRule <|-- EmployerValidationRule
   ValidationRule <|-- ManualSignatureRule
+  class DocumentExtractor {
+    <<abstract>>
+    +supports(mime) boolean
+    +extract(bytes) DocumentExtractionResult
+  }
+  class ExtractionService {
+    -extractors DocumentExtractor[]
+    +extract(bytes, mime) DocumentExtractionResult
+  }
+  ExtractionService o-- DocumentExtractor
+  DocumentExtractor <|-- DocxExtractor
+  DocumentExtractor <|-- PdfExtractor
+  DocumentExtractor <|-- DocExtractor
+  DocumentExtractor <|-- UnsupportedImageExtractor
+  class DocumentComparisonService {
+    +compare(input) ComparisonResult
+  }
+  DocumentComparisonService ..> ComparisonResult

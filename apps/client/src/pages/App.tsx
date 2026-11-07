@@ -12,8 +12,10 @@ const ApplicationFormPage = lazy(() => import('./ApplicationForm').then(m => ({ 
 const ApplicationList = lazy(() => import('./ApplicationViews').then(m => ({ default: m.ApplicationList })));
 const ApplicationDetail = lazy(() => import('./ApplicationViews').then(m => ({ default: m.ApplicationDetail })));
 const ImportPage = lazy(() => import('./ImportPage').then(m => ({ default: m.ImportPage })));
+const Register = lazy(() => import('./Register').then(m => ({ default: m.Register })));
+const ApplicationAudit = lazy(() => import('./ApplicationAudit').then(m => ({ default: m.ApplicationAudit })));
 export function App() {
-  return <Suspense fallback={<PageLoader/>}><Routes><Route path="/" element={<Landing/>}/><Route path="/privacy" element={<PrivacyPage/>}/><Route path="/cookies" element={<PrivacyPage cookies/>}/><Route path="/login" element={<main className="flex min-h-[85dvh] items-center justify-center bg-background px-5 py-8"><Login/></main>}/><Route path="*" element={<Protected><PanelLayout/></Protected>}/></Routes></Suspense>;
+  return <Suspense fallback={<PageLoader/>}><Routes><Route path="/register" element={<Register/>}/><Route path="/" element={<Landing/>}/><Route path="/privacy" element={<PrivacyPage/>}/><Route path="/cookies" element={<PrivacyPage cookies/>}/><Route path="/login" element={<main className="flex min-h-[85dvh] items-center justify-center bg-background px-5 py-8"><Login/></main>}/><Route path="*" element={<Protected><PanelLayout/></Protected>}/></Routes></Suspense>;
 }
 function PanelLayout() {
   const { user } = useAuth();
@@ -47,6 +49,8 @@ function PanelLayout() {
         <Route path="/student/completed" element={guard('ROLE_STUDENT', <ApplicationList completed/>)}/><Route path="/admin/completed" element={guard('ROLE_ADMIN', <ApplicationList admin completed/>)}/>
         <Route path="/student/upload" element={guard('ROLE_STUDENT', <ApplicationFormPage/>)}/><Route path="/admin/import" element={guard('ROLE_ADMIN', <ImportPage/>)}/>
         <Route path="/student/applications/:id/edit" element={guard('ROLE_STUDENT', <ApplicationFormPage/>)}/>
+        <Route path="/admin/applications/:id/edit" element={guard('ROLE_ADMIN', <ApplicationFormPage admin/>)}/>
+        <Route path="/admin/applications/:id/audit" element={guard('ROLE_ADMIN', <ApplicationAudit/>)}/>
         <Route path="/student/applications/:id" element={guard('ROLE_STUDENT', <ApplicationDetail/>)}/><Route path="/admin/applications/:id" element={guard('ROLE_ADMIN', <ApplicationDetail/>)}/>
         <Route path="*" element={<div className="panel"><h1 className="text-xl font-semibold">Sayfa bulunamadı</h1><Link to={base} className="mt-4 block text-teal">Panelime dön</Link></div>}/>
       </Routes></main>

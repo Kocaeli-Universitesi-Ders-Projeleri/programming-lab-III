@@ -1,0 +1,16 @@
+flowchart TD
+  A[Admin uploads CSV or XLSX] --> B[Auth role CSRF quota and worker validation]
+  B --> C[Preview with field errors and expected reference versions]
+  C --> D{Admin confirms?}
+  D -->|No| Stop[No reference write]
+  D -->|Yes| E{Owned unexpired REFERENCE batch?}
+  E -->|No| Reject[Reject safely]
+  E -->|Yes| F[Begin transaction and claim batch]
+  F --> G{Versions still match?}
+  G -->|No| Rollback[Rollback all rows and return 409]
+  G -->|Yes| H[Append valid StudentReferenceRecord versions]
+  H --> I{Unique conflict?}
+  I -->|Yes| Rollback
+  I -->|No| J[Save summary and audit then commit]
+  J --> K[Admin views latest references]
+  J --> L[Existing accounts and passwords unchanged]

@@ -2,6 +2,10 @@
 
 Bu proje soyut bir örnek sınıf listesi yerine API'nin gerçekten çağırdığı sınıfları kullanır.
 
+PHASE 5: ValidationEngine aynı polimorfik kural sonuçlarına sunucunun VIZE/FINAL politikasını uygular; ileri kurallar silinmez. InternshipApplication olağan durum geçişlerinde COMPLETED kilidini korur. Ayrı admin düzeltme komutu yetki, gerekçe ve beklenen sürümü doğrulayıp transaction içinde UNDER_REVIEW'a döndürür; revision/audit oluşturur ve önceki onayı geçersiz kılar. Bu istisna öğrenci durum geçişlerine eklenmez.
+
+PHASE 3 eklemesi: `DocumentExtractor` soyut supports/extract sözleşmesini tanımlar; `DocxExtractor`, `PdfExtractor`, `DocExtractor`, `UnsupportedImageExtractor` kalıtımla bu sözleşmeyi uygular. `ExtractionService` readonly private `#extractors` dizisini kapsüller; MIME desteğine göre aynı soyut tip üzerinden extract çağırması polimorfizmdir. Güvenlik worker'ı bu servisten önce çalışır; servis çıktısı `DocumentExtraction` kaydında manuel formdan ayrı saklanır. DOCX hücre kaynakları, PDF koordinatları ve DOC paragraf kaynakları korunur. Gerçek şablon eşlemesi doğrulanmadığı için bu sınıfların varlığı kurumsal form kabulü anlamına gelmez.
+
 ## Encapsulation — Kapsülleme
 
 `packages/shared/src/internship.ts` içindeki `InternshipApplication` sınıfının `#status` alanı dışarıdan yazılamaz. `status` getter'ı okuma sağlar; değişiklik yalnızca `transition(next, readyForApproval)` üzerinden yapılır.

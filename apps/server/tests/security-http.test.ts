@@ -6,6 +6,23 @@ import { app } from '../src/app.js';
 import { configureHttpSecurity } from '../src/middleware/httpSecurity.js';
 import { userLimit, heavyWorkAdmission, withHeavyWork } from '../src/middleware/rateLimits.js';
 describe('HTTP ve girdi sınırları', () => {
+  it('geliştirmede aynı porttaki loopback adreslerini kabul eder, yabancı adres ve portları reddeder', async () => {
+    const server = express(); configureHttpSecurity(server, { production: false, origin: 'http://localhost:5173', trustedProxies: [], hstsMaxAge: 0 });
+    server.post('/auth', (_req, res) => res.sendStatus(204));
+    for (const origin of ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://[::1]:5173']) {
+      const response = await request(server).post('/auth').set('Origin', origin);
+      expect(response.status).toBe(204); expect(response.headers['access-control-allow-origin']).toBe(origin);
+      expect((await request(server).post('/auth').set('Referer', origin + '/register')).status).toBe(204);
+    }
+    for (const origin of ['http://localhost:5174', 'http://localhost.evil.test:5173', 'null', 'https://evil.test']) expect((await request(server).post('/auth').set('Origin', origin)).status).toBe(403);
+    expect((await request(server).post('/auth').set('Origin', 'http://localhost:5173').set('Sec-Fetch-Site', 'cross-site')).status).toBe(403);
+  });
+  it('production ortamında loopback eş adlarını genişletmez', async () => {
+    const server = express(); configureHttpSecurity(server, { production: true, origin: 'https://localhost:5173', trustedProxies: ['127.0.0.1/32', '::1/128'], hstsMaxAge: 0 });
+    server.post('/auth', (_req, res) => res.sendStatus(204));
+    expect((await request(server).post('/auth').set('X-Forwarded-Proto', 'https').set('Origin', 'https://127.0.0.1:5173')).status).toBe(403);
+    expect((await request(server).options('/auth').set('X-Forwarded-Proto', 'https').set('Origin', 'https://localhost:5173').set('Access-Control-Request-Method', 'DELETE')).headers['access-control-allow-methods']).toContain('DELETE');
+  });
   it('NoSQL operatör nesnelerini ve bilinmeyen sorgu alanlarını reddeder', async () => {
     expect((await secureRequest(app).post('/api/v1/auth/login').send({ identifier: { $ne: null }, password: { $gt: '' } })).status).toBe(400);
     for (const query of [{ q: { $regex: '.*' } }, { sort: '$where' }, { page: ['1','2'] }, { $where: 'synthetic' }]) expect((await request(app).get('/api/v1/admin/students').query(query)).status).toBe(400);

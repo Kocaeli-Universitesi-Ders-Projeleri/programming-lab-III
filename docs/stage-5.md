@@ -1,5 +1,7 @@
 # Aşama 5 — Ek-16 başvuru ve belge sistemi
 
+7 Kasım PHASE 3 güncellemesi: güvenlik kontrolünü geçen DOCX/PDF/DOC'tan alan okuma, formda açık onayla uygulama ve ayrı kalıcı extraction kaydı eklendi. Görsel/metinsiz PDF'de OCR olmadan unavailable döner. [Alan haritası](ek16-field-mapping.md), [aşama raporu](vize-phase-3.md). Aşağıdaki tarihli ilk aşama açıklamalarından farklı olarak artık desteklenen belgelerde otomatik metin/alan okuma vardır; üç kaynaklı karşılaştırma PHASE 4'tür.
+
 ## Kullanım
 
 1. Öğrenci hesabıyla **Ek-16 evrak yükle** sayfasını açın.

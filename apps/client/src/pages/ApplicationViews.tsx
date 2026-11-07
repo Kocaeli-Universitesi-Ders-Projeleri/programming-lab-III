@@ -1,4 +1,7 @@
 import { ReviewControls } from './ReviewControls';
+import { ExtractionView } from './ExtractionView';
+import { ComparisonView } from './ComparisonView';
+import { AdminApplicationActions } from './AdminApplicationActions';
 import { ValidationReportView } from './ValidationReportView';
 import type { ApplicationValidationReport } from '@kou/shared';
 import { useEffect, useState } from 'react';
@@ -23,14 +26,17 @@ export function StatusBadge({ status }: { status: ApplicationStatus }) { return 
 export function ApplicationDetail() {
   const { id } = useParams(); const { user } = useAuth(); const admin = user?.role === 'ROLE_ADMIN';
   const q = useQuery({ queryKey: ['application', id], queryFn: async () => (await api.get<RecordData>('/applications/' + id)).data });
-  const report = useQuery({ queryKey: ['report', id], queryFn: async () => (await api.get<Report>('/applications/' + id + '/report')).data });
+  const report = useQuery({ queryKey: ['report', id], queryFn: async () => (await api.get<Report>('/applications/' + id + '/report', { timeout: 30000 })).data });
   if (q.isPending) return <p role="status">Başvuru yükleniyor…</p>;
   if (q.isError) return <div className="panel" role="alert">Başvuru alınamadı veya erişim yetkiniz bulunmuyor.<Button className="ml-4" onClick={() => void q.refetch()}>Tekrar dene</Button></div>;
   const a = q.data;
   return <><div className="mb-7 flex flex-wrap items-center justify-between gap-4"><div><Link className="text-sm text-teal" to={admin ? '/admin/applications' : '/student/applications'}>← Başvurulara dön</Link><h1 className="mt-3 break-all text-2xl font-semibold text-primary">{a.number}</h1><p className="mt-2 text-sm text-slate-500">{a.student?.name} · Sürüm {a.documentVersion ?? 1}</p></div><StatusBadge status={a.status}/></div>{!admin && a.status === 'INVALID' && <Button asChild className="mb-5"><Link to={`/student/applications/${id}/edit`}>Düzelt ve yeniden yükle</Link></Button>}
     <div className="grid items-start gap-6 xl:grid-cols-2"><section className="panel min-w-0"><h2 className="mb-4 font-semibold">Yüklenen belge</h2><DocumentViewer key={a.document._id} document={a.document}/></section><section className="panel"><h2 className="font-semibold">Girilen form bilgileri</h2><p className="mt-2 text-xs text-slate-500">Bu alanlar öğrenci tarafından girildi; belgeyle eşleşmeleri manuel incelenmelidir.</p><dl className="mt-5 grid gap-4 sm:grid-cols-2">{Object.entries(a.data).map(([key, value]) => <div key={key}><dt className="text-xs text-slate-500">{fieldLabels[key] ?? key}</dt><dd className="mt-1 break-words text-sm">{key === 'workingDays' ? (value as number[]).map(d => ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'][d]).join(', ') : typeof value === 'boolean' ? value ? 'Evet' : 'Hayır' : String(value === '' || value === null || value === undefined ? '—' : value)}</dd></div>)}</dl></section></div>
     <section className="panel mt-6"><h2 className="font-semibold">Doğrulama raporu</h2>{report.isPending ? <p role="status" className="mt-3">Rapor yükleniyor…</p> : report.isError || !report.data ? <p role="alert" className="mt-3 text-danger">Rapor alınamadı.<Button onClick={() => void report.refetch()} variant="outline" className="ml-3">Tekrar dene</Button></p> : <ValidationReportView report={report.data}/>}</section>
+    <ExtractionView applicationId={a._id} labels={fieldLabels}/>
+    <ComparisonView applicationId={a._id} admin={admin} status={a.status} fieldLabels={fieldLabels}/>
     {admin && <ReviewControls key={a.version} application={a} report={report.data}/>}
+    {admin && <AdminApplicationActions id={a._id} version={a.version}/>}
     <section className="panel mt-6"><h2 className="font-semibold">Başvuru geçmişi</h2><ol className="mt-4 divide-y divide-slate-100">{a.history.map(h => <li key={h._id} className="py-4"><div className="flex flex-wrap justify-between gap-2"><span className="text-sm font-medium">{statusLabels[h.status]}</span><time className="text-xs text-slate-400">{new Date(h.at).toLocaleString('tr-TR')}</time></div><p className="mt-2 text-sm text-slate-500">{h.note}</p></li>)}</ol></section>
   </>;
 }

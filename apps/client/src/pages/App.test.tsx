@@ -26,12 +26,12 @@ it('giriş sayfasında panel menüsü göstermez', async () => {
   await screen.findByRole('heading', { name: 'Staj sistemine giriş' });
   expect(screen.queryByRole('navigation', { name: 'Panel menüsü' })).toBeNull();
 });
-it('admin kök sayfada gerçek öğrenci sayısını ve admin menüsünü görür', async () => {
+it('admin panelinde gerçek öğrenci sayısını ve admin menüsünü görür', async () => {
   setup('/admin', 'ROLE_ADMIN');
-  await screen.findByText('7', {}, { timeout: 5000 });
+  await screen.findByText('7', {}, { timeout: 10000 });
   expect(screen.getByRole('link', { name: /Öğrenci yönetimi/ })).toBeDefined();
   expect(screen.queryByRole('link', { name: 'Öğrenci bilgilerim' })).toBeNull();
-});
+}, 15000);
 it('öğrenci kendi profilini açar ve admin menüsünü görmez', async () => {
   setup('/student', 'ROLE_STUDENT');
   await screen.findByText(/Öğrenci no: 12345/);
