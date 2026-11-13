@@ -44,6 +44,7 @@ app.use((error: unknown, req: express.Request, res: express.Response, _next: exp
   if (error instanceof HttpError) { res.status(error.status).json({ message: error.message }); return; }
   const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;
   const tooLarge = error !== null && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large';
+  const dbUnavailable = error instanceof Error && /MongoServerSelectionError|MongoNetworkError|server selection/i.test(error.name + ' ' + error.message);
   if (!badJson && !tooLarge) { const e = error as { name?: unknown; code?: unknown; stack?: unknown }; req.log.error({ event: 'REQUEST_ERROR', errorType: typeof e?.name === 'string' ? e.name.replace(/[^a-zA-Z0-9_]/g, '').slice(0,60) : 'Unknown', code: typeof e?.code === 'number' ? e.code : undefined, frames: typeof e?.stack === 'string' ? e.stack.split('\n').slice(1,8).join('\n') : undefined }, 'İstek işlenemedi.'); }
-  res.status(badJson ? 400 : tooLarge ? 413 : 500).json({ message: badJson ? 'Geçersiz JSON gövdesi.' : tooLarge ? 'İstek gövdesi çok büyük.' : 'Sunucu hatası. Destek için istek numarasını paylaşabilirsiniz.', requestId: req.id });
+  res.status(badJson ? 400 : tooLarge ? 413 : dbUnavailable ? 503 : 500).json({ message: badJson ? 'Geçersiz JSON gövdesi.' : tooLarge ? 'İstek gövdesi çok büyük.' : dbUnavailable ? 'Veritabanı bağlantısı şu anda kullanılamıyor. Sunucu bağlantısını kontrol edip tekrar deneyin.' : 'Sunucu hatası. Destek için istek numarasını paylaşabilirsiniz.', requestId: req.id });
 });

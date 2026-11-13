@@ -5,6 +5,7 @@ import { Login, Protected, AccountMenu, useAuth } from './Auth';
 import { Landing } from './Landing';
 import { PageLoader } from '../components/PageLoader';
 import { PrivacyPage } from '../components/Privacy';
+import { PublicNavbar } from '../components/PublicNavbar';
 const Dashboard = lazy(() => import('./Panels').then(m => ({ default: m.Dashboard })));
 const StudentProfilePage = lazy(() => import('./Panels').then(m => ({ default: m.StudentProfilePage })));
 const Students = lazy(() => import('./Panels').then(m => ({ default: m.Students })));
@@ -15,13 +16,13 @@ const ImportPage = lazy(() => import('./ImportPage').then(m => ({ default: m.Imp
 const Register = lazy(() => import('./Register').then(m => ({ default: m.Register })));
 const ApplicationAudit = lazy(() => import('./ApplicationAudit').then(m => ({ default: m.ApplicationAudit })));
 export function App() {
-  return <Suspense fallback={<PageLoader/>}><Routes><Route path="/register" element={<Register/>}/><Route path="/" element={<Landing/>}/><Route path="/privacy" element={<PrivacyPage/>}/><Route path="/cookies" element={<PrivacyPage cookies/>}/><Route path="/login" element={<main className="flex min-h-[85dvh] items-center justify-center bg-background px-5 py-8"><Login/></main>}/><Route path="*" element={<Protected><PanelLayout/></Protected>}/></Routes></Suspense>;
+  return <Suspense fallback={<PageLoader/>}><Routes><Route path="/register" element={<Register/>}/><Route path="/" element={<Landing/>}/><Route path="/privacy" element={<PrivacyPage/>}/><Route path="/cookies" element={<PrivacyPage cookies/>}/><Route path="/login" element={<><PublicNavbar/><main className="flex min-h-[85dvh] items-center justify-center bg-background px-5 py-8"><Login/></main></>}/><Route path="*" element={<Protected><PanelLayout/></Protected>}/></Routes></Suspense>;
 }
 function PanelLayout() {
   const { user } = useAuth();
   const admin = user?.role === 'ROLE_ADMIN';
   const base = admin ? '/admin' : '/student';
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   useEffect(() => { setOpen(false); }, [location.pathname]);
   useEffect(() => { if (!open) return; const close = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('keydown', close); return () => document.removeEventListener('keydown', close); }, [open]);
@@ -36,12 +37,12 @@ function PanelLayout() {
   const guard = (role: 'ROLE_ADMIN' | 'ROLE_STUDENT', child: ReactNode) => <Protected role={role}>{child}</Protected>;
   return <div className="min-h-dvh">
     {open && <button aria-label="Menüyü kapat" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-slate-950/50 md:hidden"/>}
-    <aside id="panel-menu" className={`sidebar overflow-y-auto ${open ? 'is-open' : ''}`}>
-      <Link to={base} className="flex items-center gap-3 border-b border-white/10 px-5 py-7"><img src="/kou-logo.webp" alt="Kocaeli Üniversitesi logosu" width={48} height={48} className="h-12 w-12 shrink-0 rounded-full bg-white"/><span><span className="block text-xs font-semibold tracking-wide">KOCAELİ ÜNİVERSİTESİ</span><span className="mt-1 block text-xs text-slate-300">Staj Yönetim Sistemi</span></span></Link>
-      <div className="flex items-center justify-between px-6 pt-7"><span className="text-[10px] tracking-[.2em] text-slate-400">{admin ? 'STAJ KOMİSYONU' : 'ÖĞRENCİ ÇALIŞMA ALANI'}</span><button className="md:hidden" onClick={() => setOpen(false)} aria-label="Menüyü kapat"><X size={18}/></button></div>
-      <nav className="mt-4 space-y-1 px-3 pb-5" aria-label="Panel menüsü">{links.map(item => <NavLink key={item.to} to={item.to} end className={({ isActive }) => `flex items-center gap-3 rounded-lg border-l-2 px-4 py-3 text-sm ${isActive ? 'border-teal bg-white/10 text-white' : 'border-transparent text-slate-300 hover:bg-white/5'}`}><item.icon size={18}/>{item.name}</NavLink>)}</nav>
+    <aside id="panel-menu" className={`sidebar overflow-y-auto ${open ? 'is-open' : ''} ${collapsed ? 'is-collapsed' : ''}`}>
+      <div className="sidebar-brand flex items-center border-b border-white/10 px-5 py-6"><Link to={base} className="flex min-w-0 items-center gap-3"><img src="/kou-logo.webp" alt="Kocaeli Üniversitesi logosu" width={48} height={48} className="h-12 w-12 shrink-0 rounded-full bg-white"/><span className="sidebar-label"><span className="block text-xs font-semibold tracking-wide">KOCAELİ ÜNİVERSİTESİ</span><span className="mt-1 block text-xs text-slate-300">Staj Yönetim Sistemi</span></span></Link></div>
+      <div className="flex items-center justify-between px-6 pt-7"><span className="sidebar-label text-[10px] tracking-[.2em] text-slate-400">{admin ? 'STAJ KOMİSYONU' : 'ÖĞRENCİ ÇALIŞMA ALANI'}</span><button className="md:hidden" onClick={() => setOpen(false)} aria-label="Menüyü kapat"><X size={18}/></button></div>
+      <nav className="mt-4 space-y-1 px-3 pb-5" aria-label="Panel menüsü">{links.map(item => <NavLink key={item.to} to={item.to} end title={collapsed ? item.name : undefined} className={({ isActive }) => `flex items-center gap-3 rounded-lg border-l-2 px-4 py-3 text-sm ${isActive ? 'border-teal bg-white/10 text-white' : 'border-transparent text-slate-300 hover:bg-white/5'}`}><item.icon size={18}/><span className="sidebar-label">{item.name}</span></NavLink>)}</nav>
     </aside>
-    <div className="md:ml-72"><header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 md:px-8"><div className="flex items-center gap-3"><button onClick={() => setOpen(true)} aria-label="Menüyü aç" aria-expanded={open} aria-controls="panel-menu" className="md:hidden"><Menu/></button><span className="hidden text-sm text-slate-500 lg:inline">{admin ? 'Yönetici paneli' : 'Öğrenci paneli'}<ChevronRight size={14} className="mx-2 inline"/></span><span className="text-sm font-medium">{current}</span></div><AccountMenu/></header>
+    <div className={`${collapsed ? 'md:ml-20' : 'md:ml-72'} ${open ? 'mobile-sidebar-open' : ''}`}><header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 md:px-8"><div className="flex items-center gap-3"><button onClick={() => setOpen(true)} aria-label="Menüyü aç" aria-expanded={open} aria-controls="panel-menu" className="md:hidden"><Menu/></button><button onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'} aria-expanded={!collapsed} aria-controls="panel-menu" className="hidden rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:inline-flex"><Menu size={20}/></button><span className="hidden text-sm text-slate-500 lg:inline">{admin ? 'Yönetici paneli' : 'Öğrenci paneli'}<ChevronRight size={14} className="mx-2 inline"/></span><span className="text-sm font-medium">{current}</span></div><AccountMenu/></header>
       <main className="mx-auto max-w-7xl p-5 md:p-8"><Routes>
         <Route path="/admin" element={guard('ROLE_ADMIN', <Dashboard admin/>)}/><Route path="/student" element={guard('ROLE_STUDENT', <Dashboard/>)}/>
         <Route path="/student/profile" element={guard('ROLE_STUDENT', <StudentProfilePage/>)}/><Route path="/admin/students" element={guard('ROLE_ADMIN', <Students/>)}/>

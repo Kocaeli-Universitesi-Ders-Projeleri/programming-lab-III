@@ -25,6 +25,29 @@ export const studentRowSchema = z.object({
 });
 export type StudentRow = z.infer<typeof studentRowSchema>;
 export interface PreviewRow { line: number; data: Record<string, unknown>; errors: string[] }
+function normalizeHeader(value: string) {
+  return value.normalize('NFKC').toLowerCase().replace(/\u0307/g, '').replace(/[’']/g, "'").replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+const headerAliases: Array<[RegExp, typeof columns[number]]> = [
+  [/^name$|^öğrenci ad soyad$|^ad soyad$/, 'name'],
+  [/^identitynumber$|^tc kimlik no$|^tc kimlik numarası$|^kimlik numarası$/, 'identityNumber'],
+  [/^nationality$|^uyruk$/, 'nationality'],
+  [/^studentnumber$|^öğrenci no$|^öğrenci numarası$/, 'studentNumber'],
+  [/^birthdate$|^doğum tarihi$/, 'birthDate'],
+  [/^address$|^ikametgâh adresi$|^ikametgah adresi$|^ikametgâh adresi açık adres$|^ikametgah adresi açık adres$|^adres$/, 'address'],
+  [/^department$|^öğrencinin okuduğu bölüm$|^okuduğu bölüm$|^bölüm$/, 'department'],
+  [/^academicyear$|^ek-16 teslim yılı$|^öğrencinin ek-16'yı teslim ettiği yıl(?: \d{4}-\d{4})?$/, 'academicYear'],
+  [/^previousinternshipdays$|^daha önce yapılan staj gün sayısı$|^önceki staj günü$/, 'previousInternshipDays'],
+  [/^email$|^e-posta$/, 'email'],
+  [/^phone$|^telefon no$|^telefon$/, 'phone'],
+  [/^healthstatus$|^sağlık yardımı statüsü$/, 'healthStatus'],
+];
+function canonicalHeaders(headers: string[]) {
+  return headers.map(header => {
+    const normalized = normalizeHeader(header);
+    return columns.find(column => column.toLowerCase() === normalized) ?? headerAliases.find(([pattern]) => pattern.test(normalized))?.[1] ?? '';
+  });
+}
 async function inspectZip(buffer: Buffer) {
   await new Promise<void>((resolve, reject) => {
     yauzl.fromBuffer(buffer, { lazyEntries: true, validateEntrySizes: true }, (err, zip) => {
@@ -79,8 +102,12 @@ export async function parseImport(buffer: Buffer, filename: string, mime: string
     });
   } else throw new ImportError('Yalnızca CSV ve XLSX desteklenir.');
   if (table.length < 2 || table.length > 501) throw new ImportError('Dosya 1–500 veri satırı içermeli.');
-  const headers = table[0].map(h => String(h).trim());
-  if (headers.length !== columns.length || new Set(headers).size !== headers.length || columns.some(c => !headers.includes(c))) throw new ImportError('Sütunlar şablonla eşleşmiyor. Örnek dosyadaki sütun adlarını kullanın.');
+  const rawHeaderRow = table[0].map(h => String(h).trim());
+  const lastHeader = rawHeaderRow.reduce((last, header, index) => header ? index : last, -1);
+  if (lastHeader < 0) throw new ImportError('Dosyada başlık satırı bulunamadı.');
+  table = table.map(row => row.slice(0, lastHeader + 1));
+  const headers = canonicalHeaders(table[0]);
+  if (headers.length !== columns.length || new Set(headers).size !== headers.length || columns.some(c => !headers.includes(c))) throw new ImportError('Sütunlar şablonla eşleşmiyor. Beklenen Türkçe başlıkları kullanın: öğrenci ad soyad, TC kimlik no, uyruk, öğrenci no, doğum tarihi, ikametgâh adresi, bölüm, öğretim yılı, önceki staj günü, e-posta, telefon no, sağlık yardımı statüsü.');
   const rows = table.slice(1).map((values, i): PreviewRow => {
     const raw = Object.fromEntries(headers.map((h, j) => [h, String(values[j] ?? '').trim()]));
     const parsed = studentRowSchema.safeParse(raw);

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { api } from '../services/api';
 import { ReferenceRecords } from './ReferenceRecords';
+import Swal from 'sweetalert2';
 interface Row { nextVersion?: number; line: number; data: Record<string, string | number>; errors: string[] }
 interface Preview { id: string; filename: string; rows: Row[]; valid: number; invalid: number; expiresAt: string }
 interface Result { successful: number; failed: number; failures: { line: number; errors: string[] }[]; alreadyCommitted?: boolean }
@@ -22,7 +23,19 @@ export function ImportPage() {
     catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
   async function confirm() {
-    if (!preview || busy || !window.confirm(`${preview.valid} geçerli satır kaydedilecek; ${preview.invalid} hatalı satır atlanacak. Yalnızca referans verileri kaydedilecek; hesap veya parola oluşturulmayacak. Mevcut referanslar için yeni sürüm eklenecek. Onaylıyor musunuz?`)) return;
+    if (!preview || busy) return;
+    const result = await Swal.fire({
+      title: 'Aktarımı onayla',
+      text: `${preview.valid} geçerli satır kaydedilecek; ${preview.invalid} hatalı satır atlanacak. Yalnızca referans verileri kaydedilecek; hesap veya parola oluşturulmayacak. Mevcut referanslar için yeni sürüm eklenecek.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Onayla ve kaydet',
+      cancelButtonText: 'İptal',
+      reverseButtons: true,
+      confirmButtonColor: '#123f61',
+      cancelButtonColor: '#64748b',
+    });
+    if (!result.isConfirmed) return;
     setBusy(true); setError('');
     try {
       const response = await api.post<Result>(`/admin/students/import/${preview.id}/confirm`, { confirm: true }, { timeout: 600000 });
@@ -34,7 +47,7 @@ export function ImportPage() {
   return <><div className="mb-7"><p className="mb-2 text-xs font-semibold tracking-widest text-teal">ÖĞRENCİ YÖNETİMİ</p><h1 className="text-3xl font-semibold text-primary">Veri seti aktarımı</h1><p className="mt-3 text-sm leading-6 text-slate-500">Karşılaştırma için referans verilerini yükleyin. Öğrenci hesapları ve şifreleri bu işlemden bağımsızdır.</p></div>
     <section className="panel"><div className="mb-6 flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-semibold">1. Dosya seçimi</h2><p className="mt-2 text-sm text-slate-500">CSV (UTF-8) veya XLSX · En fazla 5 MB ve 500 veri satırı · Tek sayfa</p></div><div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><a href="/samples/students.csv" download><Download size={15}/>Örnek CSV</a></Button><Button asChild variant="outline" size="sm"><a href="/samples/students.xlsx" download><Download size={15}/>Örnek Excel</a></Button></div></div>
       <form onSubmit={upload} className="flex flex-wrap items-end gap-4"><label className="min-w-0 flex-1 text-sm font-medium">Öğrenci veri dosyası<input ref={input} type="file" accept=".csv,.xlsx" required disabled={busy} onChange={e => { setFile(e.target.files?.[0]); setPreview(undefined); setResult(undefined); setError(''); }} className="mt-2 block w-full rounded-lg border border-dashed border-slate-300 p-4 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2"/></label><Button type="submit" disabled={!file || busy}><Upload size={16}/>{busy ? 'İşleniyor…' : 'Önizlemeyi oluştur'}</Button></form>
-      <details className="mt-5 text-sm text-slate-500"><summary className="cursor-pointer font-medium">Sütunlar ve dosya kuralları</summary><p className="mt-3 leading-6">Örnek dosyanın sütun adlarını koruyun. Öğrenci ve kimlik numaralarını Excel’de metin olarak saklayın. Tarihler YYYY-AA-GG, öğretim yılı 2026-2027 biçiminde olmalı. Sağlık statüsü 1–6 arasıdır. Formül ve bağlantılı Excel hücreleri kabul edilmez.</p><p className="mt-2">Örnek dosyalar yalnızca sentetik veriler içerir.</p></details>
+      <details className="mt-5 text-sm text-slate-500"><summary className="cursor-pointer font-medium">Sütunlar ve dosya kuralları</summary><p className="mt-3 leading-6">Türkçe başlıklar kabul edilir: öğrenci ad soyad, TC kimlik no, uyruk, öğrenci no, doğum tarihi, ikametgâh adresi (açık adres), öğrencinin okuduğu bölüm, öğrencinin Ek-16’yı teslim ettiği yıl, daha önce yapılan staj gün sayısı, e-posta, telefon no ve sağlık yardımı statüsü.</p><p className="mt-2">Öğrenci ve kimlik numaralarını Excel’de metin olarak saklayın. Tarihler YYYY-AA-GG, öğretim yılı 2026-2027 biçiminde olmalı. Sağlık statüsü 1–6 arasıdır. Formül ve bağlantılı Excel hücreleri kabul edilmez.</p></details>
     </section>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-danger">{error}</p>}
     {busy && <p role="status" className="mt-5 text-sm text-slate-500">Referans verileri işleniyor. Sonucu kontrol etmek için sayfayı açık tutun.</p>}

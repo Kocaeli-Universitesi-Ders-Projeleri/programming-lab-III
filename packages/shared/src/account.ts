@@ -13,7 +13,7 @@ export const studentProfileSchema = z.object({
   department: z.string().trim().min(2, 'Bölüm zorunludur.').max(150),
   nationality: z.string().trim().min(2).max(50),
   phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,30}$/, 'Geçerli telefon numarası girin.'),
-  academicYear: z.string().regex(/^\d{4}-\d{4}$/).refine(value => +value.slice(5) === +value.slice(0, 4) + 1, 'Ardışık öğretim yılları girin.'),
+  academicYear: z.string().trim().regex(/^\d{4}-\d{4}$/, 'Öğretim yılı 2026-2027 biçiminde olmalı.').refine(value => +value.slice(5) === +value.slice(0, 4) + 1, 'Ardışık öğretim yılları girin.'),
   identityNumber: z.string().regex(/^[1-9]\d{10}$/, '11 rakamdan oluşan kimlik numarası girin.'),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const d = new Date(value); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value && value < new Date().toISOString().slice(0, 10); }, 'Geçerli geçmiş tarih girin.'),
   address: z.string().trim().min(2).max(500),

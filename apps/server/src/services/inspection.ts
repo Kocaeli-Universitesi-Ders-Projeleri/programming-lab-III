@@ -12,7 +12,11 @@ async function inspect<T>(kind: 'document' | 'import' | 'extraction', bytes: Buf
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await new Promise<T>((resolve, reject) => {
-      timer = setTimeout(() => reject(new Failure('Dosya incelemesi süre sınırını aştı. Daha sade veya daha küçük bir belge yükleyin.')), kind === 'document' ? 10000 : 15000);
+      // XLSX parsing has a higher cold-start cost on Windows because ExcelJS is
+      // loaded inside an isolated worker. Keep document safety strict while
+      // allowing normal 500-row reference sheets enough time to finish.
+      const timeout = kind === 'document' ? 10000 : kind === 'import' ? 30000 : 15000;
+      timer = setTimeout(() => reject(new Failure(kind === 'import' ? 'Veri seti incelemesi süre sınırını aştı. Dosyanın tek sayfa ve 500 satırdan küçük olduğunu kontrol edin.' : 'Dosya incelemesi süre sınırını aştı. Daha sade veya daha küçük bir belge yükleyin.')), timeout);
       worker.once('message', message => message?.ok === true ? resolve(message.value) : reject(new Failure(typeof message?.message === 'string' ? message.message : 'Dosya okunamadı.')));
       worker.once('error', () => reject(new Failure('Dosya incelemesi tamamlanamadı.')));
       worker.once('exit', () => reject(new Failure('Dosya incelemesi beklenmeden sonlandı.')));
