@@ -1,6 +1,8 @@
 import { Router, type Request } from 'express';
 import multer from 'multer';
 import { createHash, randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 import { applicationSchema, countInternshipDays, InternshipApplication, todayInTurkey, type ApplicationStatus } from '@kou/shared';
@@ -27,6 +29,18 @@ applicationRoutes.use(['/applications', '/documents', '/students/me/applications
 applicationRoutes.use('/admin/applications', (req, res, next) => ['POST', 'PATCH', 'DELETE'].includes(req.method) ? adminWriteLimit(req, res, next) : next());
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.MAX_DOCUMENT_MB * 1024 * 1024, files: 1, fields: 1, fieldSize: 50000 } }).single('file');
 const studentOnly = authorize('ROLE_STUDENT'), adminOnly = authorize('ROLE_ADMIN');
+const ek16TemplatePath = fileURLToPath(new URL('../../../../ek-16.docx', import.meta.url));
+
+applicationRoutes.get('/student/ek16-template', authenticate, studentOnly, (_req, res, next) => {
+  if (!existsSync(ek16TemplatePath)) {
+    next(new HttpError(404, 'Ek-16 şablonu bulunamadı.'));
+    return;
+  }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.download(ek16TemplatePath, 'ek-16.docx', error => {
+    if (error && !res.headersSent) next(new HttpError(404, 'Ek-16 şablonu indirilemedi.'));
+  });
+});
 const fileUpload = (req: Request, res: import('express').Response, next: import('express').NextFunction) => upload(req, res, error => error ? res.status(400).json({ message: `Tek dosya ve başvuru verisi yükleyin. Boyut sınırı ${env.MAX_DOCUMENT_MB} MB.` }) : next());
 async function accessible(req: Request) {
   if (!objectIdSchema.safeParse(req.params.id).success) throw new HttpError(404, 'Başvuru bulunamadı.');
