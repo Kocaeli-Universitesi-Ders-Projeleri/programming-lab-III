@@ -4,6 +4,7 @@ import type { ApplicationStatus, ApplicationValidationReport, ManualChecks } fro
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { Button } from '../components/ui/button';
+import { confirmAction } from '../components/confirm';
 interface ReviewData { _id: string; status: ApplicationStatus; manualChecks?: Record<string, boolean> }
 const labels: Record<keyof ManualChecks, string> = { employerSignature: 'İşveren imzası var', employerStamp: 'İşveren kaşesi var', studentApprovalEmpty: 'Öğrenci onay alanı boş', advisorApprovalEmpty: 'Staj danışmanı onay alanı boş' };
 export function ReviewControls({ application: a, report }: { application: ReviewData; report?: Partial<ApplicationValidationReport> | null }) {
@@ -13,7 +14,7 @@ export function ReviewControls({ application: a, report }: { application: Review
   const ready = report?.readyForApproval === true && Object.keys(labels).every(k => checks[k] === true);
   async function action(operation: ApplicationStatus | 'review' | 'validate') {
     if (operation === 'INVALID' && !note.trim()) { toast.error('Düzeltme gerekçesi girin.'); return; }
-    if ((operation === 'APPROVED' || operation === 'COMPLETED') && !window.confirm(operation === 'COMPLETED' ? 'Başvuru öğrenci değişikliklerine kapatılacak. Komisyon düzeltmeleri gerekçe ve yeniden inceleme gerektirir. Onaylıyor musunuz?' : 'Başvuruyu onaylamak istiyor musunuz?')) return;
+    if ((operation === 'APPROVED' || operation === 'COMPLETED') && !await confirmAction(operation === 'COMPLETED' ? 'Başvuruyu tamamla?' : 'Başvuruyu onayla?', operation === 'COMPLETED' ? 'Başvuru öğrenci değişikliklerine kapatılacak. Komisyon düzeltmeleri gerekçe ve yeniden inceleme gerektirir.' : 'Başvuruyu onaylamak istiyor musunuz?')) return;
     setBusy(true);
     try {
       const path = `/admin/applications/${a._id}`;

@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { Button } from '../components/ui/button';
+import { confirmAction } from '../components/confirm';
 export function AdminApplicationActions({ id, version }: { id: string; version: number }) {
   const [open, setOpen] = useState(false), [reason, setReason] = useState(''), [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false);
   const navigate = useNavigate(), cache = useQueryClient();
   async function remove() {
-    if (busy || !confirmed || reason.trim().length < 10 || !window.confirm('Başvuru normal erişime kapatılacak. Dosyalar ve işlem geçmişi korunacak. Silmeyi onaylıyor musunuz?')) return;
+    if (busy || !confirmed || reason.trim().length < 10 || !await confirmAction('Başvuruyu pasifleştir?', 'Başvuru normal erişime kapatılacak. Dosyalar ve işlem geçmişi korunacak.', 'Pasifleştir')) return;
     setBusy(true);
     try {
       await api.delete(`/admin/applications/${id}`, { data: { version, reason, confirm: true }, timeout: 30000 });

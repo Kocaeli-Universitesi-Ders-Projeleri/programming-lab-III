@@ -10,6 +10,7 @@ import { api } from '../services/api';
 import { Button } from '../components/ui/button';
 import type { DocumentExtractionResponse } from '@kou/shared';
 import { ExtractionResultView } from './ExtractionView';
+import { confirmAction } from '../components/confirm';
 type Field = { key: keyof ApplicationInput; label: string; type?: 'number' | 'date' | 'email'; optional?: boolean };
 const groups: { title: string; fields: Field[] }[] = [
   { title: 'Öğrenci bilgileri', fields: [{ key: 'name', label: 'Ad soyad' }, { key: 'studentNumber', label: 'Öğrenci numarası' }, { key: 'identityNumber', label: 'TC / yabancı kimlik numarası' }, { key: 'nationality', label: 'Uyruk' }, { key: 'department', label: 'Bölüm' }, { key: 'birthDate', label: 'Doğum tarihi', type: 'date' }, { key: 'academicYear', label: 'Öğretim yılı (2026-2027)' }, { key: 'previousInternshipDays', label: 'Önceki staj günü', type: 'number' }, { key: 'email', label: 'E-posta', type: 'email' }, { key: 'phone', label: 'Telefon (+90)' }, { key: 'address', label: 'İkametgâh adresi' }, { key: 'healthStatus', label: 'Sağlık yardımı statüsü (1–6)', type: 'number' }] },
@@ -53,8 +54,8 @@ function ApplicationForm({ initial, id, admin = false }: { initial: { student: {
     catch (error) { setMessage((error as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Belge okunamadı. Manuel alanları doldurabilirsiniz.'); }
     finally { setReading(false); }
   }
-  function useExtractedValues() {
-    if (!extraction || !window.confirm('Okunabilen değerler formdaki ilgili alanların yerine yazılacak. Orijinal belge okuma sonucu değişmeyecek. Devam edilsin mi?')) return;
+  async function useExtractedValues() {
+    if (!extraction || !await confirmAction('Okunan değerleri aktar?', 'Okunabilen değerler formdaki ilgili alanların yerine yazılacak. Orijinal belge okuma sonucu değişmeyecek.')) return;
     const numbers = ['previousInternshipDays', 'healthStatus', 'declaredDays', 'employeeCount', 'engineerCount'];
     for (const field of extraction.extractedFields) {
       if (field.extractionStatus !== 'EXTRACTED' || field.normalizedValue === null || !(field.fieldName in defaults)) continue;
@@ -68,7 +69,7 @@ function ApplicationForm({ initial, id, admin = false }: { initial: { student: {
     if (!file && !admin) { setMessage('Ek-16 belgesi seçin.'); return; }
     if (file && file.size > initial.config.maxDocumentMB * 1024 * 1024) { setMessage(`Dosya en fazla ${initial.config.maxDocumentMB} MB olabilir.`); return; }
     if (admin && reason.trim().length < 10) { setMessage('En az 10 karakter güncelleme gerekçesi girin.'); return; }
-    if (id && !window.confirm(admin ? 'Başvuru yeni sürümle güncellenecek, yeniden incelemeye alınacak ve eski onay geçersiz olacak. Onaylıyor musunuz?' : 'Bu başvurunun formu ve belgesi yeni sürümle değiştirilecek. Onaylıyor musunuz?')) return;
+    if (id && !await confirmAction('Başvuruyu güncelle?', admin ? 'Başvuru yeni sürümle güncellenecek, yeniden incelemeye alınacak ve eski onay geçersiz olacak.' : 'Bu başvurunun formu ve belgesi yeni sürümle değiştirilecek.', 'Kaydet ve gönder')) return;
     const body = new FormData(); body.append('data', JSON.stringify(data)); if (file) body.append('file', file);
     if (admin) { body.append('reason', reason); body.append('version', String(initial.previous?.version ?? 0)); }
     try {
