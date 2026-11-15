@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReviewControls } from './ReviewControls';
 import { api } from '../services/api';
 vi.mock('../services/api', () => ({ api: { post: vi.fn(), patch: vi.fn() } }));
+vi.mock('../components/confirm', () => ({ confirmAction: vi.fn() }));
+import { confirmAction } from '../components/confirm';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 function renderControls(ready = false) { const cache = new QueryClient(); render(<QueryClientProvider client={cache}><ReviewControls application={{ _id: 'test', status: 'UNDER_REVIEW', manualChecks: ready ? { employerSignature: true, employerStamp: true, studentApprovalEmpty: true, advisorApprovalEmpty: true } : undefined }} report={{ engineComplete: true, readyForApproval: ready }}/></QueryClientProvider>); return cache; }
 it('rapor hazır değilse onay endpointini çağırmaz', async () => { renderControls(); const button = screen.getByRole('button', { name: 'Başvuruyu onayla' }); expect((button as HTMLButtonElement).disabled).toBe(true); await userEvent.setup().click(button); expect(api.patch).not.toHaveBeenCalled(); });
@@ -14,7 +16,7 @@ it('kısmi manuel incelemede işaretlenmeyenleri false gönderir', async () => {
   expect(api.post).toHaveBeenCalledWith('/admin/applications/test/review', { employerSignature: true, employerStamp: false, studentApprovalEmpty: false, advisorApprovalEmpty: false }, expect.anything());
 });
 it('hazır raporda onayı kullanıcı iptal ederse göndermez, kabul ederse gönderir', async () => {
-  vi.mocked(api.patch).mockResolvedValue({ data: {} }); vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true); renderControls(true); const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Başvuruyu onayla' })); expect(api.patch).not.toHaveBeenCalled();
-  await user.click(screen.getByRole('button', { name: 'Başvuruyu onayla' })); expect(api.patch).toHaveBeenCalledWith('/admin/applications/test/status', { status: 'APPROVED', note: '' }, expect.anything());
+  vi.mocked(api.patch).mockResolvedValue({ data: {} }); const dialog = vi.mocked(confirmAction).mockResolvedValueOnce(false).mockResolvedValueOnce(true); renderControls(true); const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Başvuruyu onayla' })); await vi.waitFor(() => expect(dialog).toHaveBeenCalledTimes(1)); expect(api.patch).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Başvuruyu onayla' })); await vi.waitFor(() => expect(api.patch).toHaveBeenCalledWith('/admin/applications/test/status', { status: 'APPROVED', note: '' }, expect.anything()));
 });

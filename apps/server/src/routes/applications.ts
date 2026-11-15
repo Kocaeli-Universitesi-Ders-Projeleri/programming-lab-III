@@ -9,7 +9,7 @@ import { applicationSchema, countInternshipDays, InternshipApplication, todayInT
 import { authenticate, authorize } from '../middleware/auth.js';
 import { env } from '../config/env.js';
 import { Application, Document, ValidationReport } from '../models/application.js';
-import { StudentProfile, AuditLog } from '../models/auth.js';
+import { StudentProfile, AuditLog, User } from '../models/auth.js';
 import { inspectDocument, inspectExtraction, DocumentError } from '../services/inspection.js';
 import { DocumentExtraction } from '../models/DocumentExtraction.js';
 import { unavailableExtraction } from '../services/extraction/fieldMapping.js';
@@ -105,18 +105,37 @@ applicationRoutes.post('/applications/extract', uploadLimit, admitHeavyWork, fil
   res.json({ ...result, documentHash: createHash('sha256').update(req.file.buffer).digest('hex') });
 }));
 applicationRoutes.post('/applications/:id/documents', studentOnly, uploadLimit, admitHeavyWork, fileUpload, withHeavyWork(submit));
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const listQuery = z.object({
+  status: z.enum(['UPLOADED', 'UNDER_REVIEW', 'INVALID', 'APPROVED', 'COMPLETED']).optional(), page: z.coerce.number().int().min(1).max(100000).default(1),
+  q: z.string().trim().max(100).optional(), department: z.string().trim().max(100).optional(), startFrom: isoDate.optional(), startTo: isoDate.optional(),
+});
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 async function list(req: Request, res: import('express').Response) {
-  const parsed = z.object({ status: z.enum(['UPLOADED', 'UNDER_REVIEW', 'INVALID', 'APPROVED', 'COMPLETED']).optional(), page: z.coerce.number().int().min(1).max(100000).default(1) }).safeParse(req.query);
+  const parsed = listQuery.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, 'Filtre veya sayfa geçersiz.');
-  const filter = { deletedAt: null, ...(req.authUser!.role === 'ROLE_STUDENT' ? { student: req.authUser!.id } : {}), ...(req.path.endsWith('/completed') ? { status: 'COMPLETED' } : parsed.data.status ? { status: parsed.data.status } : {}) };
-  const [items, total] = await Promise.all([Application.find(filter).select('number status data.startDate data.endDate calculatedDays createdAt student document').populate('document', 'originalName mime size createdAt').populate('student', 'name').sort({ createdAt: -1 }).skip((parsed.data.page - 1) * 10).limit(10).lean(), Application.countDocuments(filter)]);
+  const admin = req.authUser!.role === 'ROLE_ADMIN';
+  const { q, department, startFrom, startTo } = parsed.data;
+  if (!admin && (q || department || startFrom || startTo)) throw new HttpError(400, 'Bu filtreler yalnız yönetici listesinde kullanılabilir.');
+  if (startFrom && startTo && startFrom > startTo) throw new HttpError(400, 'Başlangıç tarihi aralığı ters sıralı.');
+  const extra: Record<string, unknown>[] = [];
+  if (q) {
+    const search = new RegExp(escapeRegex(q), 'i');
+    const users = await User.find({ role: 'ROLE_STUDENT', $or: [{ name: search }, { email: search }] }).select('_id').limit(500).lean();
+    const profiles = await StudentProfile.find({ studentNumber: search }).select('user').limit(500).lean();
+    extra.push({ $or: [{ number: search }, { 'data.name': search }, { 'data.studentNumber': search }, { student: { $in: [...users.map(u => u._id), ...profiles.map(p => p.user)] } }] });
+  }
+  if (department) extra.push({ 'data.department': new RegExp(escapeRegex(department), 'i') });
+  if (startFrom || startTo) extra.push({ 'data.startDate': { ...(startFrom ? { $gte: startFrom } : {}), ...(startTo ? { $lte: startTo } : {}) } });
+  const filter = { deletedAt: null, ...(admin ? {} : { student: req.authUser!.id }), ...(req.path.endsWith('/completed') ? { status: 'COMPLETED' } : parsed.data.status ? { status: parsed.data.status } : {}), ...(extra.length ? { $and: extra } : {}) };
+  const [items, total] = await Promise.all([Application.find(filter).select('number status data.startDate data.endDate data.studentNumber data.department calculatedDays createdAt student document').populate('document', 'originalName mime size createdAt').populate('student', 'name').sort({ createdAt: -1 }).skip((parsed.data.page - 1) * 10).limit(10).lean(), Application.countDocuments(filter)]);
   res.json({ items, total, page: parsed.data.page, pageSize: 10 });
 }
 applicationRoutes.get('/students/me/applications', studentOnly, list);
 applicationRoutes.get('/admin/applications', adminOnly, list);
 applicationRoutes.get('/admin/applications/completed', adminOnly, list);
 applicationRoutes.get(['/applications/:id', '/admin/applications/:id'], async (req, res) => {
-  if (req.path.startsWith('/admin/') && req.authUser!.role !== 'ROLE_ADMIN') throw new HttpError(403, 'Yetkiniz bulunmuyor.');
+  if (req.path.startsWith('/admin/') && req.authUser!.role !== 'ROLE_ADMIN') throw new HttpError(403, 'Yetkiniz bulunmuyor.', 'FORBIDDEN_ROLE');
   const record = await accessible(req); await record.populate('document', 'originalName mime size createdAt'); await record.populate('student', 'name email'); res.json(record);
 });
 applicationRoutes.get('/applications/:id/report', async (req, res) => {

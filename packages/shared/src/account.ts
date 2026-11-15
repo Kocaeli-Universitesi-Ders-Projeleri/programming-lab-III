@@ -21,3 +21,17 @@ export const studentProfileSchema = z.object({
   healthStatus: z.number().int().min(1).max(6),
 }).strict();
 export type StudentProfileInput = z.infer<typeof studentProfileSchema>;
+
+/** Staj evrakı teslim Google Form adresi: yalnız https docs.google.com/forms/... veya forms.gle/... kabul edilir. */
+export function isValidGoogleFormUrl(value: string): boolean {
+  let url: URL;
+  try { url = new URL(value.trim()); } catch { return false; }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+  if (url.hostname === 'forms.gle') return /^\/[A-Za-z0-9_-]{4,}\/?$/.test(url.pathname);
+  if (url.hostname === 'docs.google.com') return /^\/forms\/(u\/\d+\/)?d\/(e\/)?[A-Za-z0-9_-]{10,}(\/(viewform|edit|formResponse))?\/?$/.test(url.pathname);
+  return false;
+}
+export const googleFormUrlSchema = z.object({
+  url: z.string().trim().max(500, 'Adres en fazla 500 karakter olabilir.').refine(isValidGoogleFormUrl, 'Geçerli bir Google Form adresi girin (https://docs.google.com/forms/... veya https://forms.gle/...).'),
+}).strict();
+export type GoogleFormUrlInput = z.infer<typeof googleFormUrlSchema>;

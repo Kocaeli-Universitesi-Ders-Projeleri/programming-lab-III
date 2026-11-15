@@ -40,8 +40,10 @@ it('öğrenci kendi profilini açar ve admin menüsünü görmez', async () => {
   await screen.findByRole('heading', { name: 'Kişisel ve akademik bilgiler' });
   expect(screen.getByText('12345')).toBeDefined();
 });
-it('öğrenci admin paneline doğrudan giderse yetki hatası görür', async () => {
+it('öğrenci admin paneline doğrudan giderse oturumu kapatılıp login sayfasına yönlendirilir', async () => {
   setup('/admin', 'ROLE_STUDENT');
-  await screen.findByRole('heading', { name: 'Erişim yetkiniz bulunmuyor' });
+  await screen.findByRole('heading', { name: 'Staj sistemine giriş' });
+  await screen.findByText(/403 · Yetkisiz erişim/);
+  expect(api.post).toHaveBeenCalledWith('/auth/logout', {}, { timeout: 30000 });
   expect(api.get).not.toHaveBeenCalledWith('/admin/dashboard/stats');
 });

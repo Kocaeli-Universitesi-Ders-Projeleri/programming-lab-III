@@ -26,7 +26,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 export function authorize(role: 'ROLE_ADMIN' | 'ROLE_STUDENT') {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.authUser) { res.sendStatus(401); return; }
-    if (req.authUser.role !== role) { res.status(403).json({ message: 'Bu işlem için yetkiniz bulunmuyor.' }); return; }
+    if (req.authUser.role !== role) { res.status(403).json({ code: 'FORBIDDEN_ROLE', message: 'Bu işlem için yetkiniz bulunmuyor.' }); return; }
     next();
   };
 }

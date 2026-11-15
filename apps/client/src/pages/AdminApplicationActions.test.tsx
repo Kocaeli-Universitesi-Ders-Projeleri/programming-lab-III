@@ -6,10 +6,12 @@ import { AdminApplicationActions } from './AdminApplicationActions';
 import { ApplicationAudit } from './ApplicationAudit';
 import { api } from '../services/api';
 vi.mock('../services/api', () => ({ api: { delete: vi.fn(), get: vi.fn() } }));
+vi.mock('../components/confirm', () => ({ confirmAction: vi.fn() }));
+import { confirmAction } from '../components/confirm';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 it('silmede gerekçe, checkbox ve son onay gerekir; iptalde API çağırmaz', async () => {
   vi.mocked(api.delete).mockResolvedValue({ status: 200 });
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+  const confirm = vi.mocked(confirmAction).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   const cache = new QueryClient();
   render(<QueryClientProvider client={cache}><MemoryRouter><Routes><Route path="/" element={<AdminApplicationActions id="record" version={4}/>}/><Route path="/admin/applications/record/audit" element={<h1>İşlem geçmişi</h1>}/></Routes></MemoryRouter></QueryClientProvider>);
   fireEvent.click(screen.getByRole('button', { name: 'Başvuruyu sil' }));
@@ -18,7 +20,7 @@ it('silmede gerekçe, checkbox ve son onay gerekir; iptalde API çağırmaz', as
   fireEvent.change(screen.getByLabelText('Silme gerekçesi'), { target: { value: 'Mükerrer başvuru komisyonca kapatılacak.' } });
   expect(save.hasAttribute('disabled')).toBe(true);
   fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(save);
-  expect(confirm).toHaveBeenCalledTimes(1); expect(api.delete).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(confirm).toHaveBeenCalledTimes(1)); await vi.waitFor(() => expect(save.hasAttribute('disabled')).toBe(false)); expect(api.delete).not.toHaveBeenCalled();
   fireEvent.click(save);
   await screen.findByRole('heading', { name: 'İşlem geçmişi' });
   expect(api.delete).toHaveBeenCalledWith('/admin/applications/record', { data: { version: 4, reason: 'Mükerrer başvuru komisyonca kapatılacak.', confirm: true }, timeout: 30000 });

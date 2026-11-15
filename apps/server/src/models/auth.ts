@@ -22,6 +22,7 @@ export const StudentProfile = model('StudentProfile', new Schema({
   address: { type: String, select: false },
   previousInternshipDays: { type: Number },
   healthStatus: { type: Number, min: 1, max: 6 },
+  googleFormUrl: { type: String, default: null },
 }, { timestamps: true }));
 const sessionSchema = new Schema({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },

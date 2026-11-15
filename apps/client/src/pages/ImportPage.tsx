@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { api } from '../services/api';
 import { ReferenceRecords } from './ReferenceRecords';
-import Swal from 'sweetalert2';
+import { confirmAction } from '../components/confirm';
 interface Row { nextVersion?: number; line: number; data: Record<string, string | number>; errors: string[] }
 interface Preview { id: string; filename: string; rows: Row[]; valid: number; invalid: number; expiresAt: string }
 interface Result { successful: number; failed: number; failures: { line: number; errors: string[] }[]; alreadyCommitted?: boolean }
@@ -24,18 +24,7 @@ export function ImportPage() {
   }
   async function confirm() {
     if (!preview || busy) return;
-    const result = await Swal.fire({
-      title: 'Aktarımı onayla',
-      text: `${preview.valid} geçerli satır kaydedilecek; ${preview.invalid} hatalı satır atlanacak. Yalnızca referans verileri kaydedilecek; hesap veya parola oluşturulmayacak. Mevcut referanslar için yeni sürüm eklenecek.`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Onayla ve kaydet',
-      cancelButtonText: 'İptal',
-      reverseButtons: true,
-      confirmButtonColor: '#123f61',
-      cancelButtonColor: '#64748b',
-    });
-    if (!result.isConfirmed) return;
+    if (!await confirmAction('Aktarımı onayla', `${preview.valid} geçerli satır kaydedilecek; ${preview.invalid} hatalı satır atlanacak. Yalnızca referans verileri kaydedilecek; hesap veya parola oluşturulmayacak. Mevcut referanslar için yeni sürüm eklenecek.`, 'Onayla ve kaydet')) return;
     setBusy(true); setError('');
     try {
       const response = await api.post<Result>(`/admin/students/import/${preview.id}/confirm`, { confirm: true }, { timeout: 600000 });

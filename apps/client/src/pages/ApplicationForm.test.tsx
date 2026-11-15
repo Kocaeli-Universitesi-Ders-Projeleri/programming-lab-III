@@ -7,12 +7,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApplicationFormPage } from './ApplicationForm';
 import { api } from '../services/api';
 vi.mock('../services/api', () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
+vi.mock('../components/confirm', () => ({ confirmAction: vi.fn() }));
+import { confirmAction } from '../components/confirm';
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 it('admin tamamlanan formu eski teslim tarihiyle dosya zorunlu olmadan günceller', async () => {
   const data = validationFixture().application;
   vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/applications/record' ? { data, version: 7, status: 'COMPLETED' } : { maxDocumentMB: 10 } }));
   vi.mocked(api.patch).mockResolvedValue({ data: { id: 'record' } });
-  const dialog = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+  const dialog = vi.mocked(confirmAction).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={cache}><MemoryRouter initialEntries={['/admin/applications/record/edit']}><Routes><Route path="/admin/applications/:id/edit" element={<ApplicationFormPage admin/>}/><Route path="/admin/applications/record" element={<h1>Güncel başvuru</h1>}/></Routes></MemoryRouter></QueryClientProvider>);
   await screen.findByRole('heading', { name: 'Komisyon başvuru düzeltmesi' });
@@ -27,7 +29,7 @@ it('admin tamamlanan formu eski teslim tarihiyle dosya zorunlu olmadan güncelle
   expect(call[0]).toBe('/admin/applications/record'); expect((call[1] as FormData).get('version')).toBe('7');
   expect((call[1] as FormData).has('file')).toBe(false); expect(JSON.parse(String((call[1] as FormData).get('data'))).companyName).toBe('Düzeltilmiş İşyeri');
   expect(api.get).not.toHaveBeenCalledWith('/students/me');
-  dialog.mockRestore(); cache.clear();
+  cache.clear();
 });
 it('öğrenci profilini doldurur ve çalışma günü değişince tatilleri düşerek hesaplar', async () => {
   vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/students/me' ? { user: { name: 'Sentetik Test', email: 'test@example.test' }, profile: { studentNumber: '12345', department: 'Yazılım Mühendisliği' } } : { maxDocumentMB: 10 } }));
@@ -47,7 +49,7 @@ it('öğrenci profilini doldurur ve çalışma günü değişince tatilleri dü�
 it('belge alanlarını yalnız açık onayla forma aktarır ve ham okuma değerini korur', async () => {
   vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/students/me' ? { user: { name: 'Manuel Ad', email: 'test@example.test' }, profile: { studentNumber: '00123' } } : { maxDocumentMB: 10 } }));
   vi.mocked(api.post).mockResolvedValue({ data: { status: 'PARTIAL', extractorName: 'DocxExtractor', extractorVersion: '1', templateVersion: 'unverified', templateVerified: false, rawText: 'Ad soyad: Belgedeki Ad', extractionErrors: [], fieldSources: [], extractedFields: [{ fieldName: 'name', rawValue: 'Belgedeki Ad', normalizedValue: 'Belgedeki Ad', sourceLocation: null, extractionStatus: 'EXTRACTED' }] } });
-  const dialog = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const dialog = vi.mocked(confirmAction).mockResolvedValueOnce(true);
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={cache}><MemoryRouter><ApplicationFormPage/></MemoryRouter></QueryClientProvider>);
   await screen.findByLabelText('Ad soyad');
@@ -56,8 +58,8 @@ it('belge alanlarını yalnız açık onayla forma aktarır ve ham okuma değeri
   await screen.findByText('Belgedeki Ad');
   expect((screen.getByLabelText('Ad soyad') as HTMLInputElement).value).toBe('Manuel Ad');
   fireEvent.click(screen.getByRole('button', { name: 'Okunan değerleri forma aktar' }));
-  expect(dialog).toHaveBeenCalled(); expect((screen.getByLabelText('Ad soyad') as HTMLInputElement).value).toBe('Belgedeki Ad');
+  expect(dialog).toHaveBeenCalled(); await vi.waitFor(() => expect((screen.getByLabelText('Ad soyad') as HTMLInputElement).value).toBe('Belgedeki Ad'));
   fireEvent.change(screen.getByLabelText('Ad soyad'), { target: { value: 'Düzeltilmiş Ad' } });
   expect(screen.getByText('Belgedeki Ad')).toBeDefined();
-  dialog.mockRestore(); cache.clear();
+  cache.clear();
 });

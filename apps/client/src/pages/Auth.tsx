@@ -1,6 +1,6 @@
 import { PageLoader } from '../components/PageLoader';
-import { createContext, useContext, useState, useEffect, type FormEvent, type ReactNode } from 'react';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { createContext, useContext, useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { Navigate, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogOut, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const expire = () => { void cache.cancelQueries().then(() => { cache.removeQueries({ predicate: q => q.queryKey[0] !== 'me' }); cache.setQueryData(['me'], null); }); };
     window.addEventListener('kou:session-expired', expire); return () => window.removeEventListener('kou:session-expired', expire);
   }, [cache]);
+  const navigate = useNavigate(); const forbiddenInProgress = useRef(false);
+  useEffect(() => {
+    // Yetkisiz (403) erişimde oturum sonlandırılır ve kullanıcı login sayfasına yönlendirilir.
+    const forbidden = () => {
+      if (forbiddenInProgress.current) return; forbiddenInProgress.current = true;
+      void (async () => {
+        try { await api.post('/auth/logout', {}, { timeout: 30000 }); } catch { /* Oturum zaten geçersiz olabilir. */ }
+        await cache.cancelQueries(); cache.removeQueries({ predicate: q => q.queryKey[0] !== 'me' }); cache.setQueryData(['me'], null);
+        setTimeout(() => { navigate('/login?reason=forbidden', { replace: true }); forbiddenInProgress.current = false; }, 0);
+      })();
+    };
+    window.addEventListener('kou:forbidden', forbidden); return () => window.removeEventListener('kou:forbidden', forbidden);
+  }, [cache, navigate]);
   const q = useQuery({ queryKey: ['me'], queryFn: async () => {
     try { return (await api.get<{ user: User }>('/auth/me')).data.user; }
     catch (error) { if ((error as { response?: { status: number } }).response?.status === 401) return null; throw error; }
@@ -28,6 +41,7 @@ export function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const cache = useQueryClient();
+  const [params] = useSearchParams(); const forbidden = params.get('reason') === 'forbidden';
   if (auth.user) return <Navigate to={home(auth.user)} replace/>;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError('');
@@ -41,15 +55,19 @@ export function Login() {
     } catch (e) { setError((e as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Sunucuya ulaşılamadı. Lütfen tekrar deneyin.'); }
     finally { setBusy(false); }
   }
-  return <div className="w-full max-w-md"><div className="panel"><img src="/kou-logo.webp" alt="Kocaeli Üniversitesi" className="mx-auto h-16 w-16"/><h1 className="mt-5 text-center text-2xl font-semibold text-primary">Staj sistemine giriş</h1><p className="mt-2 text-center text-sm text-slate-500">Kullanıcı adınız veya e-posta adresinizle devam edin.</p><form onSubmit={submit} className="mt-7 space-y-5"><label className="block text-sm font-medium">Kullanıcı adı veya e-posta<input name="identifier" autoComplete="username" required maxLength={254} className="mt-2 block w-full rounded-lg border border-slate-300 p-3 focus:outline-teal"/></label><label className="block text-sm font-medium">Şifre<input name="password" type="password" autoComplete="current-password" required maxLength={128} className="mt-2 block w-full rounded-lg border border-slate-300 p-3 focus:outline-teal"/></label>{error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-danger">{error}</p>}<Button className="w-full" disabled={busy}>{busy ? 'Giriş yapılıyor…' : 'Giriş yap'}</Button></form><p className="mt-5 text-center text-sm text-slate-500">Hesabınız yok mu? <Link to="/register" className="font-medium text-teal">Öğrenci hesabı oluştur</Link></p><p className="mt-5 text-xs leading-5 text-slate-500">Beş hatalı denemeden sonra hesabınız 15 dakika kilitlenir. Oturum süresi bir saattir.</p></div></div>;
+  return <div className="w-full max-w-md"><div className="panel"><img src="/kou-logo.webp" alt="Kocaeli Üniversitesi" className="mx-auto h-16 w-16"/><h1 className="mt-5 text-center text-2xl font-semibold text-primary">Staj sistemine giriş</h1><p className="mt-2 text-center text-sm text-slate-500">Kullanıcı adınız veya e-posta adresinizle devam edin.</p>{forbidden && <p role="alert" className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><strong>403 · Yetkisiz erişim.</strong> Açmaya çalıştığınız sayfaya bu hesapla erişilemez. Oturumunuz kapatıldı; yetkili bir hesapla giriş yapın.</p>}<form onSubmit={submit} className="mt-7 space-y-5"><label className="block text-sm font-medium">Kullanıcı adı veya e-posta<input name="identifier" autoComplete="username" required maxLength={254} className="mt-2 block w-full rounded-lg border border-slate-300 p-3 focus:outline-teal"/></label><label className="block text-sm font-medium">Şifre<input name="password" type="password" autoComplete="current-password" required maxLength={128} className="mt-2 block w-full rounded-lg border border-slate-300 p-3 focus:outline-teal"/></label>{error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-danger">{error}</p>}<Button className="w-full" disabled={busy}>{busy ? 'Giriş yapılıyor…' : 'Giriş yap'}</Button></form><p className="mt-5 text-center text-sm text-slate-500">Hesabınız yok mu? <Link to="/register" className="font-medium text-teal">Öğrenci hesabı oluştur</Link></p><p className="mt-5 text-xs leading-5 text-slate-500">Beş hatalı denemeden sonra hesabınız 15 dakika kilitlenir. Oturum süresi bir saattir.</p></div></div>;
 }
 export function Protected({ role, children }: { role?: string; children: ReactNode }) {
   const auth = useContext(AuthContext);
   if (auth.pending) return <PageLoader/>;
   if (auth.failed) return <p role="alert">Oturum kontrolü yapılamadı. Sunucu bağlantısını kontrol edip sayfayı yenileyin.</p>;
   if (!auth.user) return <Navigate to="/login" replace/>;
-  if (role && auth.user.role !== role) return <div className="panel"><h1 className="text-xl">Erişim yetkiniz bulunmuyor</h1><Link className="mt-4 block text-teal" to={home(auth.user)}>Kendi panelime dön</Link></div>;
+  if (role && auth.user.role !== role) return <ForbiddenRedirect/>;
   return <>{children}</>;
+}
+function ForbiddenRedirect() {
+  useEffect(() => { window.dispatchEvent(new Event('kou:forbidden')); }, []);
+  return <div className="panel" role="alert"><h1 className="text-xl">Erişim yetkiniz bulunmuyor</h1><p className="mt-2 text-sm text-slate-500">Giriş sayfasına yönlendiriliyorsunuz…</p></div>;
 }
 export function AccountMenu() {
   const auth = useContext(AuthContext); const cache = useQueryClient(); const navigate = useNavigate(); const [busy, setBusy] = useState(false);

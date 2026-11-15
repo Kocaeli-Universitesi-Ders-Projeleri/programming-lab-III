@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { registrationSchema, studentProfileSchema } from '@kou/shared';
+import { registrationSchema, studentProfileSchema, googleFormUrlSchema } from '@kou/shared';
 import { loginAccountLimit, loginIpLimit, registrationIpLimit, registrationIdentityLimit, anonymousWorkAdmission, withHeavyWork, userLimit } from '../middleware/rateLimits.js';
 import { HttpError } from '../utils/httpError.js';
 import { User, Session, AuditLog, StudentProfile } from '../models/auth.js';
@@ -99,6 +99,19 @@ authRoutes.patch('/students/me', authenticate, authorize('ROLE_STUDENT'), userLi
   } catch (error) {
     if ((error as { code?: number }).code === 11000) throw new HttpError(409, 'Profil bilgileri mevcut bir kayıtla çakışıyor. Staj komisyonuyla iletişime geçin.');
     throw error;
+  } finally { await session.endSession(); }
+});
+authRoutes.put('/students/me/google-form', authenticate, authorize('ROLE_STUDENT'), userLimit(20, 60000), async (req, res) => {
+  const parsed = googleFormUrlSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ code: 'INVALID_GOOGLE_FORM_URL', message: parsed.error.issues[0]?.message ?? 'Geçerli bir Google Form adresi girin.' }); return; }
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const updated = await StudentProfile.updateOne({ user: req.authUser!.id }, { $set: { googleFormUrl: parsed.data.url } }, { session });
+      if (!updated.matchedCount) throw new HttpError(404, 'Öğrenci profili bulunamadı.');
+      await AuditLog.create([{ user: req.authUser!.id, event: 'GOOGLE_FORM_URL_UPDATED', ip: req.ip }], { session });
+    });
+    res.json({ googleFormUrl: parsed.data.url, message: 'Google Form adresi kaydedildi.' });
   } finally { await session.endSession(); }
 });
 authRoutes.get('/admin/access', authenticate, authorize('ROLE_ADMIN'), (req, res) => { res.json({ user: req.authUser, message: 'Yönetici erişimi doğrulandı.' }); });

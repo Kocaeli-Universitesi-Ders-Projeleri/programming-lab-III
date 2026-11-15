@@ -41,7 +41,7 @@ if (env.NODE_ENV === 'production') serveClient(app);
 app.use((_req, res) => { res.status(404).json({ message: 'Endpoint bulunamadı.' }); });
 app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (res.headersSent) { res.end(); return; }
-  if (error instanceof HttpError) { res.status(error.status).json({ message: error.message }); return; }
+  if (error instanceof HttpError) { res.status(error.status).json(error.code ? { code: error.code, message: error.message } : { message: error.message }); return; }
   const badJson = error instanceof SyntaxError && 'status' in error && error.status === 400;
   const tooLarge = error !== null && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large';
   const dbUnavailable = error instanceof Error && /MongoServerSelectionError|MongoNetworkError|server selection/i.test(error.name + ' ' + error.message);

@@ -18,6 +18,7 @@ api.interceptors.response.use(response => {
   if (config && error.response?.status === 403 && error.response.data?.code === 'CSRF_INVALID' && !config.csrfRetried) {
     config.csrfRetried = true; csrf = undefined; return api.request(config);
   }
+  if (error.response?.status === 403 && error.response.data?.code === 'FORBIDDEN_ROLE') window.dispatchEvent(new Event('kou:forbidden'));
   if (error.response?.status === 401 && !['/auth/login', '/auth/me', '/auth/logout'].includes(config?.url ?? '')) window.dispatchEvent(new Event('kou:session-expired'));
   throw error;
 });
