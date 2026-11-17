@@ -144,7 +144,7 @@ applicationRoutes.get('/applications/:id/report', async (req, res) => {
   const activePolicy = (await loadValidationOptions()).policy ?? 'VIZE';
   const policyStale = !validation || validation.policy !== activePolicy || validation.engineVersion !== ENGINE_VERSION || !validation.engineComplete;
   res.setHeader('Cache-Control', 'no-store');
-  res.json(validation ? { ...validation, policyStale, comparisonState: comparison.state, readyForApproval: Boolean(validation.readyForApproval && comparison.approvalEligible && !policyStale) } : null);
+  res.json(validation ? { ...validation, policyStale, comparisonState: comparison.state, readyForApproval: Boolean(validation.readyForApproval && comparison.approvalEligible && !policyStale), testApprovalOverride: req.authUser!.role === 'ROLE_ADMIN' && env.ALLOW_TEST_APPROVALS } : null);
 });
 applicationRoutes.get('/applications/:id/comparison', async (req, res) => {
   const record = await accessible(req); res.setHeader('Cache-Control', 'no-store'); res.json(await readComparison(String(record._id)));
@@ -202,13 +202,15 @@ applicationRoutes.get('/documents/:id/download', async (req, res) => {
 applicationRoutes.patch('/admin/applications/:id/status', adminOnly, async (req, res) => {
   const input = z.object({ status: z.enum(['UNDER_REVIEW', 'INVALID', 'APPROVED', 'COMPLETED']), note: z.string().trim().max(1000).default('') }).safeParse(req.body);
   if (!input.success || (input.data.status === 'INVALID' && !input.data.note)) throw new HttpError(400, 'Geçerli durum ve düzeltme gerekçesi girin.');
+  if (input.success && env.ALLOW_TEST_APPROVALS && ['APPROVED', 'COMPLETED'].includes(input.data.status) && !input.data.note) throw new HttpError(400, 'Test onayı için gerekçe girin.');
   const record = await accessible(req);
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      if (['APPROVED', 'COMPLETED'].includes(input.data.status)) await requireCurrentComparison(String(record._id), session);
+      const testApprovalOverride = env.ALLOW_TEST_APPROVALS && ['APPROVED', 'COMPLETED'].includes(input.data.status);
+      if (['APPROVED', 'COMPLETED'].includes(input.data.status) && !testApprovalOverride) await requireCurrentComparison(String(record._id), session);
       const report = await buildApplicationReport(record.data, record.student.toString(), record.manualChecks, session);
-      try { new InternshipApplication(record.status as ApplicationStatus).transition(input.data.status, report.readyForApproval); }
+      try { new InternshipApplication(record.status as ApplicationStatus).transition(input.data.status, report.readyForApproval || testApprovalOverride); }
       catch (error) {
         const reason = (input.data.status === 'APPROVED' || input.data.status === 'COMPLETED') && !report.readyForApproval ? `Doğrulama geçmedi: ${[...report.issues, ...report.pending].slice(0, 3).join(' ')} Raporu yeniden doğrulayın.` : (error as Error).message;
         throw new HttpError(409, reason);
@@ -216,7 +218,7 @@ applicationRoutes.patch('/admin/applications/:id/status', adminOnly, async (req,
       const update = await Application.updateOne({ _id: record._id, deletedAt: null, version: record.version, status: record.status }, { $set: { status: input.data.status, calculatedDays: report.calculatedDays }, $inc: { version: 1 }, $push: { history: { status: input.data.status, actor: req.authUser!.id, note: input.data.note, at: new Date() } } }, { session });
       if (!update.modifiedCount) throw new HttpError(409, 'Başvuru değişmiş; sayfayı yenileyin.');
       await ValidationReport.updateOne({ application: record._id }, { $set: report }, { upsert: true, session });
-      await AuditLog.create([{ user: req.authUser!.id, application: record._id, event: 'APPLICATION_STATUS_' + input.data.status, details: { from: record.status, to: input.data.status, engineVersion: report.engineVersion }, ip: req.ip }], { session });
+      await AuditLog.create([{ user: req.authUser!.id, application: record._id, event: 'APPLICATION_STATUS_' + input.data.status, details: { from: record.status, to: input.data.status, engineVersion: report.engineVersion, testApprovalOverride }, ip: req.ip }], { session });
     });
     res.json({ status: input.data.status });
   } finally { await session.endSession(); }

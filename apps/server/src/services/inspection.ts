@@ -15,7 +15,11 @@ async function inspect<T>(kind: 'document' | 'import' | 'extraction', bytes: Buf
       // XLSX parsing has a higher cold-start cost on Windows because ExcelJS is
       // loaded inside an isolated worker. Keep document safety strict while
       // allowing normal 500-row reference sheets enough time to finish.
-      const timeout = kind === 'document' ? 10000 : kind === 'import' ? 30000 : 15000;
+      // A cold worker must load the document-security stack (sharp, pdf-lib,
+      // yauzl, and file-type) before it can inspect the first byte. Ten seconds
+      // is too short on slower development machines and serverless cold starts.
+      // The heavy-work admission limit and worker memory cap still bound work.
+      const timeout = kind === 'document' ? 30000 : kind === 'import' ? 30000 : 30000;
       timer = setTimeout(() => reject(new Failure(kind === 'import' ? 'Veri seti incelemesi süre sınırını aştı. Dosyanın tek sayfa ve 500 satırdan küçük olduğunu kontrol edin.' : 'Dosya incelemesi süre sınırını aştı. Daha sade veya daha küçük bir belge yükleyin.')), timeout);
       worker.once('message', message => message?.ok === true ? resolve(message.value) : reject(new Failure(typeof message?.message === 'string' ? message.message : 'Dosya okunamadı.')));
       worker.once('error', () => reject(new Failure('Dosya incelemesi tamamlanamadı.')));
